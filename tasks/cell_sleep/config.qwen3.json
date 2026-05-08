@@ -1,0 +1,32 @@
+{
+  "workspace": {
+    "path": "workspaces",
+    "docker_image": "agent_cell_sleep",
+    "memory_limit": "4g",
+    "pids_limit": 2048,
+    "use_gpu": false
+  },
+  "num_workers": 5,
+  "higher_is_better": true,
+  "population_size": 10,
+  "num_ideas": 2,
+  "num_generations": 30,
+  "tools_config": {
+    "eval_timeout": 60
+  },
+  "timeout": 1800,
+  "task_submit_delay": 5.0,
+  "prompt_path": "prompt.md",
+  "agent_llm": {
+    "model": "Qwen/Qwen3-30B-A3B-Instruct",
+    "base_url": "http://localhost:8002/v1",
+    "temperature": 0.7,
+    "top_p": 0.95
+  },
+  "manager_llm": {
+    "model": "Qwen/Qwen3-30B-A3B-Instruct",
+    "base_url": "http://localhost:8002/v1",
+    "temperature": 0.0,
+    "top_p": 0.95
+  }
+}
