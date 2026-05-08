@@ -1,0 +1,33 @@
+{
+  "workspace": {
+    "path": "workspaces",
+    "docker_image": "agent_cell_sleep",
+    "memory_limit": "4g",
+    "pids_limit": 2048,
+    "use_gpu": false
+  },
+  "num_workers": 2,
+  "higher_is_better": true,
+  "population_size": 4,
+  "num_ideas": 2,
+  "num_generations": 3,
+  "tools_config": {
+    "eval_timeout": 60
+  },
+  "timeout": 900,
+  "task_submit_delay": 15.0,
+  "prompt_path": "prompt.md",
+  // Local: gemma4 via Docker Desktop AI engine
+  "agent_llm": {
+    "model": "ai/gemma4:latest",
+    "base_url": "http://localhost:12434/engines/v1",
+    "temperature": 0.7,
+    "top_p": 0.95
+  },
+  "manager_llm": {
+    "model": "ai/gemma4:latest",
+    "base_url": "http://localhost:12434/engines/v1",
+    "temperature": 0.0,
+    "top_p": 0.95
+  }
+}

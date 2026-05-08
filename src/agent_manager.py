@@ -40,6 +40,42 @@ from utils import (
 # Bracket pairs for JSON extraction from LLM output (handles strings and escape)
 _JSON_BRACKETS = ("[", "]"), ("{", "}")
 
+# Valid single-char JSON escape sequences (RFC 8259 §7)
+_JSON_VALID_ESCAPES = set('"\\/ bfnrt')
+
+
+def _sanitize_json_escapes(text: str) -> str:
+    """Replace invalid JSON escape sequences (e.g. LaTeX \\ge, \\{) with their literal chars."""
+    result = []
+    i = 0
+    in_string = False
+    while i < len(text):
+        c = text[i]
+        if not in_string:
+            if c == '"':
+                in_string = True
+            result.append(c)
+            i += 1
+        else:
+            if c == '"':
+                in_string = False
+                result.append(c)
+                i += 1
+            elif c == '\\' and i + 1 < len(text):
+                next_c = text[i + 1]
+                if next_c in _JSON_VALID_ESCAPES or next_c == 'u':
+                    result.append(c)
+                    result.append(next_c)
+                    i += 2
+                else:
+                    # Invalid escape — double the backslash to make it valid
+                    result.append('\\\\')
+                    i += 1
+            else:
+                result.append(c)
+                i += 1
+    return ''.join(result)
+
 
 def _extract_json_fragment(text: str, open_char: str) -> Optional[str]:
     """Extract a JSON array or object from text (from first open_char to matching close). Returns None if not found."""
@@ -563,6 +599,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
         text = _extract_json_fragment(text, "[")
         if text is None:
             return None
+        text = _sanitize_json_escapes(text)
         try:
             data = json.loads(text)
             if not isinstance(data, list) or len(data) < n:
@@ -588,6 +625,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
         text = _extract_json_fragment(text, "{")
         if text is None:
             return None
+        text = _sanitize_json_escapes(text)
         try:
             data = json.loads(text)
             if not isinstance(data, dict):
@@ -712,6 +750,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
         text = _extract_json_fragment(text, "[")
         if text is None:
             return None
+        text = _sanitize_json_escapes(text)
         try:
             data = json.loads(text)
             if not isinstance(data, list) or len(data) < n:
