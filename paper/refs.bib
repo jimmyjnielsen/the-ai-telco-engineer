@@ -2,99 +2,185 @@
 % References for "Affordable LLM-Based Wireless Algorithm
 % Discovery via Hybrid Cloud-Local Agents"
 % IEEE Wireless Communications Magazine, SI submission, 2026
+%
+% Bibliography limit per magazine guidelines: 15 references.
+% Web/preprint references include accessed dates as required.
+% Hardware/software product pages have been moved to
+% footnotes in main.tex per magazine convention.
 % ============================================================
 
+% --- [1] Primary paper we extend ---
 @article{aitaoudia2026aite,
-  author    = {A{\"i}t Aoudia, Fay\c{c}al and Hoydis, Jakob and Cammerer, Sebastian and Maggi, Lorenzo and Marti, Gian and Keller, Alexander},
+  author    = {A\"{\i}t Aoudia, Fay\c{c}al and Hoydis, Jakob and Cammerer, Sebastian and Maggi, Lorenzo and Marti, Gian and Keller, Alexander},
   title     = {The {AI} Telco Engineer: Toward Autonomous Discovery of Wireless Communications Algorithms},
   journal   = {arXiv preprint arXiv:2604.19803},
   year      = {2026},
-  note      = {Update reference if/when journal version is published.}
+  note      = {Accessed: 2026-05-17. Update if journal version is published before submission.}
 }
 
+% --- [2] vLLM / PagedAttention ---
 @inproceedings{kwon2023vllm,
   author    = {Kwon, Woosuk and Li, Zhuohan and Zhuang, Siyuan and Sheng, Ying and Zheng, Lianmin and Yu, Cody Hao and Gonzalez, Joseph E. and Zhang, Hao and Stoica, Ion},
   title     = {Efficient Memory Management for Large Language Model Serving with {PagedAttention}},
   booktitle = {Proceedings of the 29th Symposium on Operating Systems Principles ({SOSP})},
+  year      = {2023},
+  pages     = {611--626},
+  doi       = {10.1145/3600006.3613165}
+}
+
+% --- [3] FunSearch (LLM algorithm discovery, seminal modern instance) ---
+@article{romeraparedes2024funsearch,
+  author    = {Romera-Paredes, Bernardino and Barekatain, Mohammadamin and Novikov, Alexander and Balog, Matej and Kumar, M. Pawan and Dupont, Emilien and Ruiz, Francisco J. R. and Ellenberg, Jordan S. and Wang, Pengming and Fawzi, Omar and Kohli, Pushmeet and Fawzi, Alhussein},
+  title     = {Mathematical discoveries from program search with large language models},
+  journal   = {Nature},
+  volume    = {625},
+  number    = {7995},
+  pages     = {468--475},
+  year      = {2024},
+  doi       = {10.1038/s41586-023-06924-6}
+}
+
+% --- [4] AlphaEvolve (LLM algorithm discovery, recent extension) ---
+@article{novikov2025alphaevolve,
+  author    = {Novikov, Alexander and Vu, Ngan and Eisenberger, Marvin and Dupont, Emilien and Huang, Po-Sen and Wagner, Adam Zsolt and Shirobokov, Sergey and Kozlovskii, Borislav and Ruiz, Francisco J. R. and Mehrabian, Abbas and Kumar, M. Pawan and See, Abigail and Chaudhuri, Swarat and Holland, George and Davies, Alex and Nowozin, Sebastian and Kohli, Pushmeet and Balog, Matej},
+  title     = {{AlphaEvolve}: A coding agent for scientific and algorithmic discovery},
+  journal   = {arXiv preprint arXiv:2506.13131},
+  year      = {2025},
+  note      = {Accessed: 2026-05-17.}
+}
+
+% --- [5] (removed during trim to fit 15-reference magazine limit;
+%         see note at end of file) ---
+
+% --- [6] AI Scientist (LLM-driven research automation, breadth framing) ---
+@article{lu2024aiscientist,
+  author    = {Lu, Chris and Lu, Cong and Lange, Robert Tjarko and Foerster, Jakob and Clune, Jeff and Ha, David},
+  title     = {The {AI} Scientist: Towards Fully Automated Open-Ended Scientific Discovery},
+  journal   = {arXiv preprint arXiv:2408.06292},
+  year      = {2024},
+  note      = {Accessed: 2026-05-17.}
+}
+
+% --- [7] ReAct (interleaved reasoning + tool use; foundational for our manager-agent loop) ---
+@inproceedings{yao2023react,
+  author    = {Yao, Shunyu and Zhao, Jeffrey and Yu, Dian and Du, Nan and Shafran, Izhak and Narasimhan, Karthik and Cao, Yuan},
+  title     = {{ReAct}: Synergizing Reasoning and Acting in Language Models},
+  booktitle = {International Conference on Learning Representations ({ICLR})},
   year      = {2023}
 }
 
-@misc{gemma4,
-  author    = {{Google DeepMind}},
-  title     = {Gemma 4: An Open-Weight Mixture-of-Experts Instruction-Tuned Model},
-  year      = {2025},
-  note      = {Technical report; \url{https://ai.google.dev/gemma}. Update with final reference at submission.}
+% --- [8] Toolformer (LLMs learning to call tools) ---
+@inproceedings{schick2023toolformer,
+  author    = {Schick, Timo and Dwivedi-Yu, Jane and Dess\`{i}, Roberto and Raileanu, Roberta and Lomeli, Maria and Zettlemoyer, Luke and Cancedda, Nicola and Scialom, Thomas},
+  title     = {Toolformer: Language Models Can Teach Themselves to Use Tools},
+  booktitle = {Advances in Neural Information Processing Systems ({NeurIPS})},
+  year      = {2023}
 }
 
-@misc{qwen3,
-  author    = {{Qwen Team, Alibaba}},
-  title     = {Qwen3: A Compact Mixture-of-Experts Language Model Series},
-  year      = {2025},
-  note      = {Technical report. Update with final reference at submission.}
-}
-
-@misc{anthropic-claude,
-  author    = {{Anthropic}},
-  title     = {Claude Opus 4.7 and Sonnet 4.6 Model Cards},
-  year      = {2026},
-  note      = {\url{https://www.anthropic.com/}. Update with permanent reference at submission.}
-}
-
-@misc{litellm,
-  author    = {{BerriAI}},
-  title     = {{LiteLLM}: A Unified Interface to {100+} {LLM} {APIs}},
+% --- [9] Bariah et al. (LLMs for telecom, magazine perspective) ---
+@article{bariah2024llmtelecom,
+  author    = {Bariah, Lina and Zhao, Qiyang and Zou, Hang and Tian, Yu and Bader, Faouzi and Debbah, Merouane},
+  title     = {Large Generative {AI} Models for Telecom: The Next Big Thing?},
+  journal   = {IEEE Communications Magazine},
+  volume    = {62},
+  pages     = {84--90},
   year      = {2024},
-  note      = {\url{https://github.com/BerriAI/litellm}}
+  doi       = {10.1109/MCOM.001.2300364}
 }
 
-@misc{sionna,
-  author    = {Hoydis, Jakob and Cammerer, Sebastian and A{\"i}t Aoudia, Fay\c{c}al and Vem, Avinash and Binder, Nikolaus and Marcus, Guillermo and Keller, Alexander},
-  title     = {{Sionna}: An Open-Source Library for Next-Generation Physical Layer Research},
-  year      = {2022--2025},
-  note      = {\url{https://nvlabs.github.io/sionna/}. Update with most recent citation at submission.}
+% --- [10] WirelessLLM (recent LLM-for-wireless framework) ---
+@article{shao2024wirelessllm,
+  author    = {Shao, Jiawei and Tong, Jingwen and Wu, Qiong and Guo, Wei and Li, Zijian and Lin, Zehong and Zhang, Jun},
+  title     = {{WirelessLLM}: Empowering Large Language Models Towards Wireless Intelligence},
+  journal   = {Journal of Communications and Information Networks},
+  volume    = {9},
+  number    = {2},
+  pages     = {99--112},
+  year      = {2024},
+  doi       = {10.23919/JCIN.2024.10272373}
 }
 
-@misc{nvidia-dgx-spark,
-  author    = {{NVIDIA Corporation}},
-  title     = {{NVIDIA DGX Spark}: Personal {AI} Supercomputer Powered by {Blackwell}},
+% --- [11] Zhou et al. (comprehensive LLM-for-telecom survey) ---
+@article{zhou2024llmtelecomsurvey,
+  author    = {Zhou, Hao and Hu, Chengming and Yuan, Ye and Cui, Yufei and Jin, Yili and Chen, Cong and Wu, Haochen and Yuan, Dun and Jiang, Li and Wu, Di and Liu, Xue and Zhang, Charlie and Wang, Xianbin and Liu, Jiangchuan},
+  title     = {Large Language Model ({LLM}) for Telecommunications: A Comprehensive Survey on Principles, Key Techniques, and Opportunities},
+  journal   = {IEEE Communications Surveys \& Tutorials},
+  volume    = {27},
+  pages     = {1955--2005},
+  year      = {2024},
+  doi       = {10.1109/COMST.2024.3465447},
+  note      = {Author list reconstructed from arXiv:2405.10825; verify exact ordering against IEEE Xplore proof at submission.}
+}
+
+% --- [12] Orca (continuous batching, antecedent to vLLM) ---
+@inproceedings{yu2022orca,
+  author    = {Yu, Gyeong-In and Jeong, Joo Seong and Kim, Geon-Woo and Kim, Soojeong and Chun, Byung-Gon},
+  title     = {{Orca}: A Distributed Serving System for Transformer-Based Generative Models},
+  booktitle = {16th USENIX Symposium on Operating Systems Design and Implementation ({OSDI})},
+  year      = {2022},
+  pages     = {521--538}
+}
+
+% --- [13] Switch Transformers (sparse MoE foundational) ---
+@article{fedus2022switch,
+  author    = {Fedus, William and Zoph, Barret and Shazeer, Noam},
+  title     = {Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity},
+  journal   = {Journal of Machine Learning Research},
+  volume    = {23},
+  number    = {120},
+  pages     = {1--39},
+  year      = {2022}
+}
+
+% --- [14] OLLA reference (classical link adaptation baseline) ---
+@inproceedings{sampath1997olla,
+  author    = {Sampath, A. and Kumar, P. S. and Holtzman, J. M.},
+  title     = {On Setting Reverse Link Target {SIR} in a {CDMA} System},
+  booktitle = {Proceedings of the 47th {IEEE} Vehicular Technology Conference ({VTC} Spring)},
+  volume    = {2},
+  pages     = {929--933},
+  year      = {1997},
+  doi       = {10.1109/VETEC.1997.600465}
+}
+
+% --- [15] Björnson et al. (perspective on AI in wireless R&D; shared coauthor with [1]) ---
+@article{bjornson2026automating,
+  author    = {Bj\"ornson, Emil and Dohler, Mischa and Hoydis, Jakob and Heath~Jr., Robert W.},
+  title     = {Automating Wireless Research and Development: What Remains Human?},
+  journal   = {Preprints},
   year      = {2026},
-  note      = {Product specification. 128\,GB unified LPDDR5x, 273\,GB/s, GB10 Superchip. \url{https://www.nvidia.com/en-us/products/workstations/dgx-spark/}. Pricing \$4,699 (Feb.\ 2026).}
+  month     = apr,
+  doi       = {10.20944/preprints202604.1172.v1},
+  note      = {Accessed: 2026-05-17.}
 }
 
-@misc{apple-mac-studio,
-  author    = {{Apple Inc.}},
-  title     = {{Mac Studio} with {M3 Ultra}: Technical Specifications},
-  year      = {2025},
-  note      = {Up to 512\,GB unified LPDDR5x, 819\,GB/s. \url{https://www.apple.com/mac-studio/specs/}.}
-}
-
-@misc{amd-strix-halo,
-  author    = {{Advanced Micro Devices, Inc.}},
-  title     = {{AMD Ryzen AI Max+ 395} Processor (``{Strix Halo}'')},
-  year      = {2025},
-  note      = {Up to 128\,GB unified memory; up to 96\,GB allocatable to integrated GPU via Variable Graphics Memory. \url{https://www.amd.com/en/processors/ryzen-ai-max}.}
-}
-
-@misc{nvidia-rtx-pro-6000,
-  author    = {{NVIDIA Corporation}},
-  title     = {{NVIDIA RTX PRO 6000 Blackwell Workstation Edition}},
-  year      = {2025},
-  note      = {96\,GB GDDR7 ECC, $\sim$1.79\,TB/s memory bandwidth. Workstation pricing \$8,000--\$9,200 (2026). \url{https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/}.}
+% --- Sionna citation kept available; cited only if the link adaptation
+%     evaluator's underlying simulation library is mentioned by name in §II ---
+@misc{sionna,
+  author    = {Hoydis, Jakob and Cammerer, Sebastian and A\"{\i}t Aoudia, Fay\c{c}al and Vem, Avinash and Binder, Nikolaus and Marcus, Guillermo and Keller, Alexander},
+  title     = {{Sionna}: An Open-Source Library for Next-Generation Physical Layer Research},
+  howpublished = {\url{https://nvlabs.github.io/sionna/}},
+  year      = {2022--2025},
+  note      = {Accessed: 2026-05-17.}
 }
 
 % ============================================================
-% References to add as drafting progresses:
+% Trim history and candidates for further trim:
 %
-% [OLLA / outer-loop link adaptation] — Sampath et al.,
-%   "A Fourth-Generation MIMO-OFDM Broadband Wireless System"
-%   or another canonical OLLA reference. Cross-check what
-%   the AI Telco Engineer paper cites.
+% REMOVED to fit the 15-reference magazine limit:
+%  - liu2024llm4ad  (formerly [5])  — overlapped with FunSearch [3] and
+%       AlphaEvolve [4] in the "LLM-driven algorithm discovery" family.
+%       Re-add if a second referee asks for more breadth in the
+%       LLM-research-automation citations.
 %
-% [Continuous batching / Orca] — Yu et al., "Orca: A Distributed
-%   Serving System for Transformer-Based Generative Models,"
-%   OSDI 2022 — optional, alongside vLLM citation.
+% REMAINING TRIM CANDIDATES if the bibliography still feels dense:
+%  - zhou2024llmtelecomsurvey — overlap with [9] bariah2024llmtelecom
+%       on LLMs-in-telecom framing. Bariah alone covers the same ground
+%       at magazine-level; drop the Surveys & Tutorials piece if 14
+%       references suffices.
+%  - shao2024wirelessllm — drop only if not cited in the prose;
+%       originally selected for the "same magazine" connection, which
+%       no longer applies after venue correction (JCIN, not IEEE WCM).
 %
-% [LLM-for-wireless prior work] — pick 2–3 representative
-%   recent works for the magazine introduction; e.g.
-%   WirelessLLM, LLM4Comm, agentic-AI-for-RAN papers.
+% Current cited set size: 15 (sionna IS cited in section II; counted).
 % ============================================================
