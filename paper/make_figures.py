@@ -80,11 +80,12 @@ def load_per_generation(task_dir: str):
 
 
 def make_fig2():
-    # Configurations (manager varies, agents fixed = Gemma4-26B)
+    # Configurations (manager varies, agents fixed = Gemma4-26B).
+    # Labels use the short Manager-Agent naming used in Table I.
     configs = [
-        ("link_adaptation_a0", "Local Gemma4-26B manager", "tab:gray",   "o", "-"),
-        ("link_adaptation_f0", "Cloud Sonnet 4.6 manager", "tab:orange", "s", "-"),
-        ("link_adaptation_f1", "Cloud Opus 4.7 manager",   "tab:blue",   "^", "-"),
+        ("link_adaptation_a1", "G4-G4 (local Gemma4 manager)",   "tab:gray",   "o", "-"),
+        ("link_adaptation_f0", "So-G4 (Sonnet 4.6 manager)",     "tab:orange", "s", "-"),
+        ("link_adaptation_f1", "Op-G4 (Opus 4.7 manager)",       "tab:blue",   "^", "-"),
     ]
 
     fig, (ax_top, ax_bot) = plt.subplots(
@@ -110,7 +111,7 @@ def make_fig2():
                         xytext=(3, 0), textcoords="offset points",
                         fontsize=7, color="black", alpha=0.8, va="center", ha="left")
 
-    ax_top.set_ylabel("Best SE (bps/Hz)")
+    ax_top.set_ylabel("Best training SE (bps/Hz)")
     ax_top.set_ylim(2.3, 3.65)
     ax_top.set_yticks([2.4, 2.7, 3.0, 3.3, 3.6])
     ax_top.grid(True, alpha=0.25)
@@ -333,12 +334,14 @@ def make_fig1():
 # ═══════════════════════════════════════════════════════════════════════
 
 def make_fig4():
+    # Configurations matching the four-cell manager x agent grid in Table I.
+    # Names match Table I's Manager-Agent short labels.
     configs = [
-        # (label,                          task_dir,                color,        marker, linestyle)
-        ("Local Gemma4 / Gemma4 agents",   "link_adaptation_a0",    "tab:gray",   "o",    "-"),
-        ("Local Gemma4 / Qwen3 agents",    "link_adaptation_b0",    "tab:red",    "x",    "-"),
-        ("Cloud Opus / Gemma4 agents",     "link_adaptation_f1",    "tab:blue",   "^",    "-"),
-        ("Cloud Opus / Qwen3 agents",      "link_adaptation_g0",    "tab:cyan",   "v",    "-"),
+        # (label,    task_dir,                color,        marker, linestyle)
+        ("G4-G4",    "link_adaptation_a1",    "tab:gray",   "o",    "-"),
+        ("Q3-Q3",    "link_adaptation_b0",    "tab:red",    "x",    "-"),
+        ("Op-G4",    "link_adaptation_f1",    "tab:blue",   "^",    "-"),
+        ("Op-Q3",    "link_adaptation_g0",    "tab:cyan",   "v",    "-"),
     ]
 
     fig, ax = plt.subplots(figsize=(3.5, 2.8))
@@ -363,13 +366,13 @@ def make_fig4():
                     fontsize=6.5, color="black", alpha=0.8, va="center", ha="left")
 
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Best SE (bps/Hz)")
+    ax.set_ylabel("Best training SE (bps/Hz)")
     ax.set_xlim(-0.5, 20.5)
     ax.set_xticks(range(0, 21, 4))
     ax.set_ylim(0.4, 3.65)
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="lower right", framealpha=0.95, frameon=True,
-              fancybox=False, edgecolor="black", fontsize=7)
+    ax.legend(loc="center right", framealpha=0.95, frameon=True,
+              fancybox=False, edgecolor="black", fontsize=8, title="Mgr-Agt", title_fontsize=8)
 
     fig.subplots_adjust(left=0.14, right=0.78, top=0.97, bottom=0.13)
     fig.savefig(FIG_DIR / "fig4-grid.pdf")
