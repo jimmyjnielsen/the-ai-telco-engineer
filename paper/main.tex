@@ -259,23 +259,16 @@ The hybrid deployment depends on a competent local agent model, but ``competent'
 
 \subsection{The four-way grid}
 
-Table~\ref{tab:grid} arranges the four configurations of \{local Gemma4, cloud Opus\} manager $\times$ \{Gemma4, Qwen3\} agent. The same generation-and-agent count applies (ten generations except for the fully-local runs, which are twenty). We report training-set best scores for the grid because the held-out evaluation of the fully-local Qwen3-agent configuration (LA-B0) would not affect the qualitative conclusion: its training-set best is already an order of magnitude below the other three cells.
+Fig.~\ref{fig:grid} arranges the four configurations of \{local Gemma4, cloud Opus\} manager $\times$ \{Gemma4, Qwen3\} agent and shows the running-max best spectral efficiency at each generation. Each line's all-time best is marked with a star at the generation in which it was first achieved. The same generation-and-agent count applies (ten generations except for the fully-local runs, which are twenty). We show training-set scores because the held-out evaluation of the fully-local Qwen3-agent configuration (LA-B0) does not change the qualitative conclusion: its training-set ceiling is already an order of magnitude below the other three cells.
 
-\begin{table}[t]
+\begin{figure}[t]
 \centering
-\caption{Manager $\times$ agent grid: training-set best spectral efficiency (bps/Hz).}
-\label{tab:grid}
-\begin{tabular}{lcc}
-\hline
-                                  & Gemma4-26B agents        & Qwen3-30B agents \\
-\hline
-Local Gemma4-26B manager          & 2.989 (LA-A0, 20 gen)    & 0.868 (LA-B0, 20 gen) \\
-Cloud Opus 4.7 manager            & 3.077 (LA-F1, 10 gen)    & 3.065 (LA-G0, 10 gen) \\
-\hline
-\end{tabular}
-\end{table}
+\includegraphics[width=0.95\columnwidth]{fig4-grid}
+\caption{Running-max best spectral efficiency per generation for the four configurations of the manager $\times$ agent grid. Stars mark the generation in which each run's all-time best was first achieved. The cliff-edge collapse of the fully-local Qwen3-agent configuration (red, LA-B0) sits two orders of magnitude below the other three cells, far outside any plausible within-run noise. Under the Opus manager, the two agent models (blue: Gemma4, cyan: Qwen3) track each other within experimental noise. Horizontal reference lines mark OLLA, GPT-OSS 120B, and GPT-5.4~\cite{aitaoudia2026aite}.}
+\label{fig:grid}
+\end{figure}
 
-Two observations dominate the grid. First, the Qwen3 agents perform indistinguishably from the Gemma4 agents under the Opus manager: 3.065 versus 3.077 on the training metric and 3.4434 versus 3.4618 on the held-out evaluation set --- a difference of approximately 0.02\,bps/Hz, comparable to the within-run candidate spread quantified in \S\ref{sec:case}. We therefore cannot claim from single-run data that one agent model is better than the other under a strong manager; the two configurations should be read as performing equivalently within experimental noise. Second, and in sharp contrast, the Qwen3 agents collapse under the local Gemma4 manager: their best score is below 1\,bps/Hz across twenty generations, more than two bps/Hz below any other cell in the grid --- a difference of two orders of magnitude relative to the noise floor and therefore robust to any plausible inter-run variance. The agent model choice is roughly indifferent in the top row of Table~\ref{tab:grid}; but the bottom-row collapse establishes that the agent model becomes a binding constraint when the manager is weak.
+Two observations dominate Fig.~\ref{fig:grid}. First, under the Opus manager, the Qwen3 trajectory (cyan) closely tracks the Gemma4 trajectory (blue), with the two final-best scores differing by approximately 0.02\,bps/Hz on the training metric and 0.02\,bps/Hz on the held-out evaluation set (3.4434 versus 3.4618). This is comparable to the within-run candidate spread quantified in \S\ref{sec:case}. We therefore cannot claim from single-run data that one agent model is better than the other when the manager is strong; the two configurations should be read as performing equivalently within experimental noise. Second, and in sharp contrast, the Qwen3 agents collapse under the local Gemma4 manager: the running-max best (red) plateaus below 1\,bps/Hz across twenty generations, more than two bps/Hz below any other cell --- a gap of two orders of magnitude relative to the noise floor, robust to any plausible inter-run variance. The agent model choice is roughly indifferent for the top two configurations; the bottom-row collapse establishes that the agent model becomes a binding constraint when the manager is weak.
 
 \subsection{Success rate is not quality}
 
@@ -291,7 +284,7 @@ We emphasise that this article evaluates the two models' appropriateness as agen
 
 \subsection{Practitioner guidance}
 
-Two practitioner-relevant statements survive the single-run, within-noise caveat. First, agent model choice between competent compact MoE candidates is a second-order knob when a strong manager is available: in our setup the two evaluated agents perform within experimental noise of each other under the Opus manager. Investing API budget or hardware in upgrading the manager is therefore a more reliable lever than swapping between similar agent models. Second, agent model choice becomes a first-order constraint when a strong manager is not available: the same Qwen3 agents that match Gemma4 under Opus fall an order of magnitude below OLLA in the fully-local Qwen3-only configuration. The cliff-edge in the bottom-left cell of Table~\ref{tab:grid} is robust to any plausible within-noise correction and is the clearest practitioner-relevant message of this section: a fully-local deployment is sensitive to the agent--manager combination in a way that the cloud-managed hybrid is not.
+Two practitioner-relevant statements survive the single-run, within-noise caveat. First, agent model choice between competent compact MoE candidates is a second-order knob when a strong manager is available: in our setup the two evaluated agents perform within experimental noise of each other under the Opus manager. Investing API budget or hardware in upgrading the manager is therefore a more reliable lever than swapping between similar agent models. Second, agent model choice becomes a first-order constraint when a strong manager is not available: the same Qwen3 agents that match Gemma4 under Opus fall an order of magnitude below OLLA in the fully-local Qwen3-only configuration. The cliff-edge in Fig.~\ref{fig:grid} is robust to any plausible within-noise correction and is the clearest practitioner-relevant message of this section: a fully-local deployment is sensitive to the agent--manager combination in a way that the cloud-managed hybrid is not.
 
 The two-step heuristic we suggest for a new deployment is: prioritise a strong manager (cloud or open-weight, as budget permits); then choose any compact agent model that fits the platform's headroom-aware memory budget (\S\ref{sec:hwlandscape}) and that supports vLLM tool-call parsing reliably. Among the agent models we evaluated, the inference-profile distinction documented above is consequential --- thinking-suppressed Qwen3 and reasoning-on Gemma4 produce different journals and different per-turn cost profiles, even if their final scores are statistically equivalent under a strong manager.
 

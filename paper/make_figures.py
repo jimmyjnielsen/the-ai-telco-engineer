@@ -45,7 +45,7 @@ OLLA = 3.4196
 GPT_OSS_120B = 3.3976
 GPT_5_4 = 3.5370
 
-REPO = Path("/home/jjn/repos/the-ai-telco-engineer")
+REPO = Path(__file__).resolve().parent.parent
 FIG_DIR = REPO / "paper" / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -326,7 +326,60 @@ def make_fig1():
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Figure 4 — Manager x Agent grid as 4-line running-max trajectory
+# Replaces the earlier Table III. Visualises the cliff-edge of LA-B0
+# (fully-local Qwen3-only) and the near-equivalence of F1 and G0 (Opus
+# manager with either agent model) in one image.
+# ═══════════════════════════════════════════════════════════════════════
+
+def make_fig4():
+    configs = [
+        # (label,                          task_dir,                color,        marker, linestyle)
+        ("Local Gemma4 / Gemma4 agents",   "link_adaptation_a0",    "tab:gray",   "o",    "-"),
+        ("Local Gemma4 / Qwen3 agents",    "link_adaptation_b0",    "tab:red",    "x",    "-"),
+        ("Cloud Opus / Gemma4 agents",     "link_adaptation_f1",    "tab:blue",   "^",    "-"),
+        ("Cloud Opus / Qwen3 agents",      "link_adaptation_g0",    "tab:cyan",   "v",    "-"),
+    ]
+
+    fig, ax = plt.subplots(figsize=(3.5, 2.8))
+
+    for label, task_dir, color, marker, ls in configs:
+        gens, best, _ = load_per_generation(task_dir)
+        ax.plot(gens, best, marker=marker, color=color, linestyle=ls, label=label, alpha=0.95)
+        if len(best) > 0:
+            final = np.nanmax(best)
+            idx = next(i for i, v in enumerate(best) if np.isclose(v, final))
+            ax.plot(gens[idx], best[idx], marker="*", markersize=11,
+                    markerfacecolor=color, markeredgecolor="black",
+                    markeredgewidth=0.6, linestyle="None", zorder=5)
+
+    # Reference lines — labels in the right-hand margin to avoid stacking
+    for y, lbl, lstyle in [(OLLA, "OLLA", "--"),
+                           (GPT_OSS_120B, "GPT-OSS 120B", ":"),
+                           (GPT_5_4, "GPT-5.4", "-.")]:
+        ax.axhline(y, color="black", linewidth=0.6, linestyle=lstyle, alpha=0.55)
+        ax.annotate(lbl, xy=(1.0, y), xycoords=("axes fraction", "data"),
+                    xytext=(3, 0), textcoords="offset points",
+                    fontsize=6.5, color="black", alpha=0.8, va="center", ha="left")
+
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Best SE (bps/Hz)")
+    ax.set_xlim(-0.5, 20.5)
+    ax.set_xticks(range(0, 21, 4))
+    ax.set_ylim(0.4, 3.65)
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="lower right", framealpha=0.95, frameon=True,
+              fancybox=False, edgecolor="black", fontsize=7)
+
+    fig.subplots_adjust(left=0.14, right=0.78, top=0.97, bottom=0.13)
+    fig.savefig(FIG_DIR / "fig4-grid.pdf")
+    fig.savefig(FIG_DIR / "fig4-grid.png")
+    print(f"Wrote {FIG_DIR}/fig4-grid.{{pdf,png}}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     make_fig1()
     make_fig2()
     make_fig3()
+    make_fig4()

@@ -11,6 +11,17 @@ __pycache__/
 # macOS Finder
 .DS_Store
 
+# LaTeX build artifacts (only the main.tex byproducts; figures stay tracked)
+paper/main.aux
+paper/main.bbl
+paper/main.blg
+paper/main.fdb_latexmk
+paper/main.fls
+paper/main.synctex.gz
+paper/main.out
+paper/main.pdf
+paper/main.toc
+
 # Per-agent workspace contents (large: journals, draft.py, .local pip installs,
 # seed-*, gen-*, all per-worker subdirectories under workspaces/)
 tasks/*/workspaces/*/
