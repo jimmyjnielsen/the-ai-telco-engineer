@@ -1,0 +1,322 @@
+% ============================================================
+% IEEE Wireless Communications Magazine — Special Issue
+% "Agentified Embodied AI for Mobile Edge General Intelligence"
+% Submission deadline: 1 June 2026
+%
+% Single-file source: all sections, abstract, biography in this file.
+% Bibliography in refs.bib.
+% Figures go in figures/ subdirectory.
+% ============================================================
+
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{xspace}
+
+% Convenience commands for drafting placeholders
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\tbd}[1]{\textcolor{blue}{[#1]}}
+
+\graphicspath{{figures/}}
+
+\begin{document}
+
+% ============================================================
+\title{Affordable LLM-Based Wireless Algorithm Discovery via Hybrid Cloud-Local Agents}
+
+\author{
+Jimmy~J.~Nielsen,~\IEEEmembership{Senior~Member,~IEEE}
+\thanks{J.~J.~Nielsen is with the Department of Electronic Systems, Aalborg University, Denmark (e-mail: jjn@es.aau.dk).}
+}
+
+\markboth{IEEE Wireless Communications Magazine, Special Issue on Agentified Embodied AI for Mobile Edge General Intelligence, 2026}{Nielsen: Affordable LLM-Based Wireless Algorithm Discovery via Hybrid Cloud-Local Agents}
+
+\maketitle
+
+% ============================================================
+\begin{abstract}
+Recent work has shown that large language model (LLM) agents can autonomously discover competitive wireless communication algorithms by iteratively proposing, implementing, and evaluating candidate solutions. However, published demonstrations rely on either frontier closed-weight cloud models or open-weight models that exceed the memory of typical research GPUs, placing this capability out of reach for most research groups. We describe a hybrid cloud-local deployment that decomposes the LLM agent loop along its natural traffic asymmetry: a frontier cloud LLM serves the sparse, strategic \emph{manager} role, while a compact open-weight model running locally on a single 128\,GB workstation serves the dense, implementation-intensive \emph{agent} role. On the link adaptation task from a recent NVIDIA framework, this hybrid deployment exceeds both the fine-tuned outer-loop link adaptation (OLLA) baseline (3.4196\,bps/Hz) by 1.2\,\% and the published open-weight cloud baseline (GPT-OSS 120B, 3.3976\,bps/Hz) by 1.9\,\%, reaching 3.4618\,bps/Hz in ten generations on the workstation paired with a frontier cloud manager --- within 2.1\,\% of the published GPT-5.4 result and at approximately one order of magnitude lower cloud token consumption than a fully-cloud deployment. We further provide the first per-generation convergence analysis of this task and show that manager model quality affects three distinct levers --- final score ceiling, agent success rate, and the number of generations required to reach the ceiling, the last by a factor of roughly six between the strongest and weakest manager we tested. We conclude with a practitioner's recipe and an outlook on the remaining barriers to broader adoption.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Large language models, LLM agents, wireless algorithm discovery, link adaptation, MCS selection, hybrid cloud-edge inference, vLLM.
+\end{IEEEkeywords}
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+\IEEEPARstart{A}{gentic} artificial intelligence has begun to enter the wireless research workflow. Coding agents draft prototypes, retrieval agents reproduce results, and most recently, manager-and-implementer loops have been shown to autonomously \emph{design} wireless communication algorithms from a problem description and an evaluation tool alone. The recent \emph{AI Telco Engineer} framework~\cite{aitaoudia2026aite} is an instructive instance: in a matter of hours of compute time, agentic loops were able to generate channel estimation and link adaptation algorithms competitive with the strong classical baselines that took our community years to refine. The implication is striking. If wireless algorithm design becomes a target task for general-purpose agentic AI, then \emph{how} we deploy that AI determines who participates in the design process.
+
+The catch is that the deployments demonstrated so far sit at two extremes. On one end, frontier closed-weight cloud models such as GPT-5.4 deliver the strongest results~\cite{aitaoudia2026aite} but, used end-to-end across hundreds of multi-turn agent sessions, accumulate substantial cloud-API spending. On the other end, open-weight alternatives such as GPT-OSS 120B require approximately 240\,GB of GPU memory in BF16, exceeding the capacity of a single workstation-class GPU and forcing a multi-GPU server or cluster. Either path imposes a non-trivial barrier on the research group that would otherwise try the approach. The barrier is also pedagogical: as long as algorithm discovery with LLM agents is something that happens \emph{somewhere else}, the wireless community develops its intuition slowly.
+
+We argue that the manager--agent decomposition that defines this class of frameworks also defines a natural deployment decomposition. Manager calls are \emph{sparse} and \emph{strategic}: one idea-generation call per generation and one summary call per agent, with moderate input context. Agent calls are \emph{dense} and \emph{implementation-bound}: each agent runs a multi-turn code-write--evaluate--debug loop carrying an accumulating context that grows from a few thousand to fifteen thousand tokens by the end of a session. The two roles differ in volume by an order of magnitude, in context size by roughly the same factor, and --- most importantly --- in the kind of capability they require. Strategic synthesis benefits sharply from frontier scale; implementation of well-scoped code does not.
+
+In this article we describe a \emph{hybrid} cloud-local deployment that follows this asymmetry directly. A frontier cloud LLM serves the manager role; a compact open-weight mixture-of-experts (MoE) model running locally under vLLM serves the agent role on a single 128\,GB workstation (an NVIDIA DGX Spark). The manager pays a small cloud bill for what cloud is good at; the agents pay a one-time hardware cost for what local inference is good at. We evaluate this design on the link adaptation task introduced in~\cite{aitaoudia2026aite}, with the following contributions:
+
+\begin{itemize}
+    \item \textbf{Hybrid deployment (\S\ref{sec:hybrid}).} A frontier cloud manager paired with a 26B-parameter open-weight agent on a single workstation reaches 3.4618\,bps/Hz on the held-out evaluation set --- exceeding the fine-tuned OLLA baseline by 1.2\,\% and the published open-weight cloud baseline (GPT-OSS 120B) by 1.9\,\% --- within 2.1\,\% of the frontier closed-weight result (GPT-5.4), at approximately one order of magnitude lower cloud token consumption than a fully-cloud deployment.
+    \item \textbf{Manager quality affects three levers (\S\ref{sec:case}).} The original paper~\cite{aitaoudia2026aite} reports only final scores for link adaptation. We give the first per-generation convergence analysis for this task and find that manager quality shifts not only the score ceiling but also the agent success rate and the number of generations required to reach the ceiling --- a $\sim$6$\times$ compression of the generation budget between the weakest and strongest manager we tested.
+    \item \textbf{Agent model selection (\S\ref{sec:agentmodel}).} Holding the manager constant, we compare two open-weight agent models with different active-parameter counts and code-generation profiles, and find that a high per-generation success rate does not by itself predict final performance.
+\end{itemize}
+
+The remainder of the article is organised as follows. Section~\ref{sec:background} reviews the agentic loop for wireless algorithm discovery. Section~\ref{sec:challenge} characterises the deployment challenge at workstation scale. Section~\ref{sec:hybrid} introduces the hybrid architecture. Section~\ref{sec:case} presents the link adaptation case study. Section~\ref{sec:agentmodel} treats agent model selection. Section~\ref{sec:open} discusses open challenges, and Section~\ref{sec:conclusion} concludes.
+
+% ============================================================
+\section{Background: LLM Agent Loops for Wireless Algorithm Discovery}
+\label{sec:background}
+
+The agentic framework introduced in~\cite{aitaoudia2026aite}, which our work builds on, instantiates a two-tier evolutionary optimisation loop. We summarise it briefly to fix notation; further details and the full set of design choices are in the original paper.
+
+Two LLM roles cooperate. A \emph{manager} LLM, given a problem description and the cumulative results of all prior generations, proposes $N$ candidate algorithmic ideas per generation and summarises the solutions produced by individual agents. An \emph{agent} LLM, given one assigned idea and access to an isolated containerised workspace with code-editing and evaluation tools, implements a Python solution that the framework's evaluator scores against a held-out instance distribution. A generation consists of $M$ agents (with $M \geq N$, distributing $M/N$ agents per idea) running concurrently up to a per-agent wall-clock timeout; the best-scoring solution is preserved across generations.
+
+The agent loop is the implementation-intensive component. Within its time budget, an agent typically writes a draft solution, invokes the evaluator, observes the returned metric and any errors, edits its code, re-evaluates, and iterates several times. Each iteration is an LLM call carrying the system prompt, task description, evolving working code, and accumulated tool outputs --- a context that begins around two to four thousand tokens and grows by several thousand on each turn. By contrast, the manager performs $O(\text{generations})$ idea-generation calls and $O(\text{generations} \cdot \text{agents})$ summary calls, each with moderate context. The structural asymmetry between the two roles --- volume, context size, and the kind of capability each demands --- is the lever this article exploits.
+
+We focus throughout on the framework's \emph{link adaptation} task, which the original paper inherits from a well-studied wireless control problem~\cite{aitaoudia2026aite}. The agent must implement a Modulation and Coding Scheme (MCS) selection controller that, given recent HARQ feedback and the history of acknowledged MCS indices, maximises long-term spectral efficiency (bps/Hz) over 50 ray-traced SNR trajectories of 3000 slots each, subject to a long-term block error rate constraint of 10\,\%. Two helper functions --- mapping an estimated SNR to per-MCS block error rates and selecting the highest MCS satisfying a target BLER --- are injected into the agent's workspace at evaluation time, encouraging agents to use a shared standard mapping rather than reinvent it. The evaluation runs CPU-only inside the agent container, a property we return to in Section~\ref{sec:challenge} because it makes link adaptation the cleanest of the framework's tasks for isolating LLM-only deployment variables.
+
+A standard outer-loop link adaptation (OLLA) controller, with its conservative SNR back-off step fine-tuned to the evaluation trajectories, achieves 3.4196\,bps/Hz on this task and serves as the strong external baseline. The original paper~\cite{aitaoudia2026aite} reports that an agentic loop driven by GPT-5.4 reaches 3.5370\,bps/Hz (+3.43\,\% over OLLA), and an open-weight alternative driven by GPT-OSS 120B reaches 3.3976\,bps/Hz (--0.64\,\%). These three numbers anchor the remainder of the article.
+
+% ============================================================
+\section{The Workstation-Scale Deployment Challenge}
+\label{sec:challenge}
+
+Reproducing or extending agentic wireless algorithm discovery on a single workstation faces three constraints that are easy to underestimate.
+
+\textbf{Memory.} GPT-OSS 120B in half-precision (BF16) occupies approximately 240\,GB of GPU memory; even quantised to 8 bits its raw weights still exceed the unified memory of a single NVIDIA GB10 ``Grace Blackwell'' workstation (128\,GB total; $\sim$120\,GB practically usable once vLLM, the operating system, and a usable key-value cache for five concurrent agent sessions are accounted for). Models with comparable instruction-following quality but a smaller in-memory footprint are required, and the choice is essentially exhausted by the open-weight Mixture-of-Experts releases that have appeared since 2024.
+
+\textbf{Concurrency.} The agentic framework runs multiple agents in parallel each generation; a fully-cloud deployment obtains concurrency from the provider's serving infrastructure. On a local workstation, naïvely serialising agents would multiply wall-clock time per generation by the number of agents. Modern LLM serving stacks, vLLM~\cite{kwon2023vllm} foremost among them, address this through \emph{continuous batching}: requests of arbitrary length share each forward pass at the granularity of a single decoded token, exploiting the typical pattern of long input prefixes and shorter generation suffixes. Combined with prefix caching of the shared system prompt, continuous batching turns five concurrent agents on a single workstation GPU into a workload whose aggregate throughput approaches the structural parallelism of a cloud endpoint with high concurrency limits. We measure approximately 64 tokens per second aggregate across five agents with a 90\,\% prefix cache hit rate on the framework's shared system prompt.
+
+\textbf{Cloud cost at the dense end.} A fully-cloud deployment with frontier models is feasible technically but accumulates token consumption rapidly. For our case study below, the cloud token consumption of a fully-cloud run with a frontier manager and competent agents is on the order of millions of tokens per ten-generation run, predominantly from the agent role; this is what our hybrid deployment removes.
+
+The first two constraints suggest a compact, well-engineered open-weight agent model running under a continuous-batching serving stack on a single workstation. The third invites a closer look at \emph{which} of the two roles --- manager or agent --- benefits most from frontier scale and which can be served by a smaller model at acceptable quality. That question motivates the architecture in the next section.
+
+\subsection{Workstation hardware options}
+\label{sec:hwlandscape}
+
+Two design choices dominate the current workstation-class compute market, with strikingly different cost per gigabyte of model memory.
+
+\textbf{Unified-memory systems} share a single LPDDR5x pool between CPU and an integrated GPU or accelerator, eliminating both the cost of dedicated GDDR/HBM and any host-to-device transfer step. Three representative platforms anchor this category:
+\begin{itemize}
+    \item \emph{NVIDIA DGX Spark} (the platform used in this study) and OEM equivalents from Acer, ASUS, Dell, and MSI carry the GB10 Grace--Blackwell Superchip with 128\,GB unified LPDDR5x at 273\,GB/s, priced at \$4,699 as of February 2026 (initial \$3,999) \cite{nvidia-dgx-spark}.
+    \item \emph{Apple Mac Studio M3 Ultra} offers up to 512\,GB of unified LPDDR5x at 819\,GB/s --- approximately three times the bandwidth of the Spark --- at \$9,499 for the maximum configuration. Apple discontinued the 512\,GB tier in early 2026; 256\,GB and below remain available \cite{apple-mac-studio}.
+    \item \emph{AMD Ryzen AI Max+ 395} (``Strix Halo'') mini-PCs from Framework, GMKtec, HP, and others reach 128\,GB of unified memory at approximately 256\,GB/s, with prices starting near \$1,500. Up to 96\,GB of the unified pool can be allocated as graphics memory through AMD's Variable Graphics Memory feature \cite{amd-strix-halo}.
+\end{itemize}
+
+\textbf{Dedicated-VRAM workstations} pair a host CPU with one or more discrete GPUs whose GDDR7 or HBM memory delivers substantially higher bandwidth (and, on professional cards, ECC) at much higher cost per gigabyte. NVIDIA's RTX PRO 6000 Blackwell carries 96\,GB of GDDR7 ECC at approximately 1.79\,TB/s, retailing at \$8,000--\$9,200 in 2026~\cite{nvidia-rtx-pro-6000} --- a comparable memory footprint to a DGX Spark, but at roughly twice the GPU cost alone, before adding host system, cooling, and power supply. Datacenter-class parts (NVIDIA H100, 80\,GB HBM3, $\sim$\$25,000+) deliver yet higher bandwidth (3\,TB/s) but are not workstation purchases. The cost-per-gigabyte gap between unified-memory and dedicated-VRAM systems is roughly an order of magnitude at the 96--128\,GB scale.
+
+\textbf{Bandwidth versus capacity for batched agent serving.} Raw memory bandwidth is the principal determinant of \emph{single-stream} LLM inference latency, since it bounds the rate at which weight tensors can be fetched per generated token. In the concurrent batched workload that vLLM constructs across $N$ parallel agent sessions, however, the bandwidth cost of fetching weights amortises across all in-flight requests within a forward pass: one read of the weight matrix produces output tokens for every active session. The dominant per-agent cost shifts toward the per-session key-value cache footprint and the compute throughput of the active expert layers. In practical terms, on our DGX Spark deployment, single-agent throughput is approximately 13\,tok/s, whereas aggregate throughput across five concurrent agents reaches approximately 64\,tok/s --- a near-linear scaling that converts the platform's relatively modest 273\,GB/s into adequate serving capacity for the framework's parallelism. The same continuous-batching mechanism would extract proportionally more throughput on higher-bandwidth platforms, but the marginal gain rarely justifies the price premium for this workload.
+
+\textbf{Implications for the deployment.} The unified-memory class is currently the most cost-effective route to the 80--120\,GB-of-RAM range that competent open-weight agents need with headroom for parallel KV cache. Within that class, the choice between Spark, Mac Studio, and Strix Halo is shaped by software ecosystem (CUDA on Spark; MLX on Mac; ROCm on Strix Halo) at least as much as by raw silicon. We use the DGX Spark in this study because its CUDA stack hosts vLLM directly --- a prerequisite for the continuous-batching feature this article relies on --- and because the GB10 SoC's native FP8 and FP4 tensor-core support opens NVFP4 quantisation as a path to fitting yet larger open-weight models on the same platform.
+
+\textbf{Sizing the agent model to the platform.} The model choices in this study are deliberately conservative within the 128\,GB envelope. A 48\,GB Gemma4-26B agent paired with a vLLM KV cache for five concurrent sessions at 32\,K context (approximately 40\,GB at BF16) consumes about 93\,GB of the pool, leaving roughly a 35\,GB margin for runtime and operating-system overhead. Substantially larger open-weight models --- for instance, NVFP4-quantised Nemotron-Super-120B-A12B (approximately 80\,GB on disk) or a quantised variant of GPT-OSS 120B itself --- fit the same platform on paper but consume the headroom that vLLM's batched serving needs to keep five agents resident in parallel, forcing a trade against either concurrency or per-agent context length. The hybrid deployment we describe is independent of the specific agent model, and a larger-active-parameter agent on the same platform is a natural follow-up; whether it is the most productive use of the next budget unit is a separate question, addressed next.
+
+A higher-capacity unified-memory platform --- for example, an Apple Mac Studio with 256\,GB or more --- would relax this three-way trade-off and admit a meaningfully larger agent model. However, the same concurrency/context/weight tension reappears at the larger scale: a 200\,GB agent still requires proportional KV cache to serve parallel agents, and at the FP8 or NVFP4 quantisation that makes large models tractable, KV cache memory frequently dominates weight memory at workstation context lengths. More importantly, the empirical evidence in this study suggests that agent scale is not the dominant lever. Holding the agent fixed at Gemma4-26B (\S\ref{sec:case}), upgrading the manager from Claude Sonnet 4.6 to Claude Opus 4.7 lifted held-out spectral efficiency by approximately 0.06\,bps/Hz, while the agent-model comparison of \S\ref{sec:agentmodel} shows that two compact MoE agents of similar active-parameter count produce results within a narrow band of each other when the manager is held strong. Together these results argue for prioritising manager quality over agent scale when allocating the next budget unit, and for treating the agent slot on the workstation as a ``good enough'' component rather than something to maximise.
+
+\textbf{Why open-weight Mixture-of-Experts.} For the agent role, where memory headroom dominates the choice, sparse Mixture-of-Experts (MoE) models are a particularly good fit on unified-memory hardware. A sparse MoE activates only a small subset of feed-forward experts per token: the memory footprint scales with the \emph{total} parameter count, while inference latency scales with the \emph{active} parameter count. A 26-billion-total / 4-billion-active model has the knowledge capacity of a model many times larger than its inference speed would suggest --- precisely the trade-off that turns a \$4,700 workstation into a usable platform for agentic algorithm discovery. We rely on this property in choosing both Gemma4-26B-A4B-it and Qwen3-30B-A3B-FP8 as candidate agent models below.
+
+% ============================================================
+\section{Hybrid Cloud--Local Architecture}
+\label{sec:hybrid}
+
+Fig.~\ref{fig:architecture} contrasts the single-LLM deployment used in prior work~\cite{aitaoudia2026aite} with the hybrid two-LLM deployment we propose.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig1-architecture}
+\caption{Single-LLM (a) versus hybrid two-LLM (b) deployment of the agentic algorithm-discovery loop. In the single-LLM design, both the sparse strategic calls of the manager and the dense implementation-bound calls of the agents are served by the same model --- either a frontier closed-weight cloud API or a large open-weight model that requires a multi-GPU server. In the hybrid design, the two roles are split along their natural traffic asymmetry: a frontier cloud LLM serves the manager role; a compact open-weight Mixture-of-Experts model served locally by vLLM on a single 128\,GB workstation serves the agent role, with continuous batching providing concurrency across parallel agent containers.}
+\label{fig:architecture}
+\end{figure*}
+
+\subsection{Traffic asymmetry between roles}
+
+The defining property of the agentic loop --- and the property our design exploits --- is the asymmetric traffic profile of its two roles. Per generation:
+\begin{itemize}
+    \item The manager issues one idea-generation call (input: accumulated history of prior generations and current task description, roughly a few thousand tokens; output: a structured set of $N$ ideas, a few hundred tokens) and one summary call per agent on completion ($M$ summary calls; each input is a final agent journal plus task context, output is a short structured summary). Total: $\sim$$11$ calls per generation in our setup.
+    \item Each agent makes a sequence of LLM calls forming a code-write--evaluate--debug loop. Each call carries the system prompt, task description, prior turns, and tool outputs. The number of turns ranges from a handful to over ten, depending on agent model and idea complexity; input contexts grow from a few thousand tokens on the first turn to ten to fifteen thousand by the last. Total: roughly $100$--$600$ calls per generation across all agents.
+\end{itemize}
+
+In aggregate, the agent role accounts for $\sim 90\,\%$ of LLM calls and an even larger share of input tokens. If both roles run on the same endpoint, that endpoint must absorb the dense agent traffic. Splitting the roles across endpoints --- a strong manager on a sparse, cheap channel; a competent agent on a dense, free channel --- decouples the cost of the two and lets each be optimised independently.
+
+\subsection{Local agent infrastructure}
+
+The agent endpoint is a vLLM~\cite{kwon2023vllm} server running on a single NVIDIA DGX Spark workstation with an NVIDIA GB10 Grace--Blackwell Superchip and 128\,GB of unified memory shared between CPU and GPU (see \S\ref{sec:hwlandscape} for the broader hardware landscape). We serve Gemma4-26B-A4B-it~\cite{gemma4} in BF16 by default. The model occupies approximately 48\,GB of weight memory; the remaining $\sim$72\,GB accommodates a generous key-value cache for five concurrent agent sessions at the framework's 32\,K context window.
+
+Three vLLM features are load-bearing. \emph{Continuous batching} merges concurrent agent requests at token granularity, producing an aggregate throughput close to the single-stream maximum even with five active sessions. \emph{Prefix caching} stores the prefill activations of the shared system prompt and task description, hitting roughly 90\,\% reuse across agents on our workload. \emph{Native tool-call parsing} (Gemma4 parser) ensures that the agent's structured function-call output is reliably converted into the framework's tool-invocation format without prompt-side post-processing.
+
+Each agent runs inside a Docker workspace with the editor and evaluator tools; up to five workspaces run concurrently. The framework dispatches up to two agent batches of five workspaces per generation, separated by a small staggered submission delay to avoid coincident first-turn bursts.
+
+\subsection{Cloud manager via OpenAI-compatible proxy}
+
+The manager endpoint is the Anthropic API serving Claude Opus 4.7~\cite{anthropic-claude} (and, in one baseline configuration below, Claude Sonnet 4.6). We expose it to the framework through a LiteLLM~\cite{litellm} proxy listening on a local OpenAI-compatible port, so that the framework's existing OpenAI client can address the cloud manager and the local vLLM endpoint through a uniform configuration. The choice of cloud manager is, in principle, free: any frontier-capability model that emits structured JSON reliably would substitute. We use Opus 4.7 because (i) it is in the same capability tier as the GPT-5.4 used by~\cite{aitaoudia2026aite}, providing a meaningful comparison, and (ii) its rate limits are compatible with the manager role's sparse-call pattern, even though they would not support the dense-call pattern of agents.
+
+The asymmetric design pays off in three places. First, cloud cost is bounded by the sparse manager traffic, which we will quantify in \S\ref{sec:case}. Second, local agent inference is paid for once, in hardware, and adds zero marginal cost per call --- enabling the longer per-generation budgets and additional generations that improve results without re-incurring API expense. Third, sensitive data and proprietary task descriptions remain local: only the manager's distilled idea proposals and agent summaries cross the cloud boundary, never the full agent journals.
+
+\subsection{One framework modification: bounded knowledge state}
+\label{sec:consolidation}
+
+The original framework~\cite{aitaoudia2026aite} concatenates per-agent summaries across all completed generations into the manager's input context. The accumulated history grows by approximately 500--1000 tokens per generation, which is unproblematic for a 200\,K-context cloud manager but reaches the 32\,K context window of common open-weight managers around generation 25. We modified the framework to compress accumulated summaries into a bounded ``knowledge state'' at the end of each generation, structured by score-bucket and worth-retrying flag. Subsequent generations receive the compressed knowledge state plus only the latest generation's raw results, keeping manager input tokens roughly constant.
+
+This modification has been active in every result reported in this article. Its principal motivation is to make long-horizon runs (twenty generations and beyond) tractable on open-weight managers; whether it also affects final-score performance on the ten-generation runs we use as our case study is a separate question, addressed in \S\ref{sec:open}.
+
+% ============================================================
+\section{Case Study: Link Adaptation Algorithm Discovery}
+\label{sec:case}
+
+We instantiate the hybrid deployment on the link adaptation task introduced in Section~\ref{sec:background} and compare it against two reference configurations: a fully-local baseline that runs both the manager and the agent on the same open-weight Gemma4-26B-A4B-it model, and a fully-cloud reference inherited from the original paper~\cite{aitaoudia2026aite} that used GPT-5.4 and GPT-OSS 120B for both roles.
+
+\subsection{Experimental setup}
+
+We run the framework at the same iteration scale as~\cite{aitaoudia2026aite}: ten generations of ten agents per generation, with five candidate ideas proposed by the manager at each generation and two agents per idea. Each agent runs in an isolated Docker container for at most 900 seconds of wall-clock time; the framework's CPU-only evaluator scores each draft solution on 50 ray-traced channel trajectories of 3000 slots each over a Munich urban scene generated with Sionna~\cite{sionna}. Final results in Table~\ref{tab:results} are scored on a held-out evaluation set of 50 separate trajectories drawn from the same scene to detect overfitting to the training trajectories. We report the average spectral efficiency (bps/Hz) over the trajectories on which the long-term BLER constraint is satisfied; all reported configurations satisfy the constraint on all 50 evaluation trajectories.
+
+The fully-local configuration extends to twenty generations because preliminary experiments showed its convergence trajectory remained gradually improving past the ten-generation horizon at which the cloud-managed configurations had plateaued. The convergence comparison reported below (Fig.~\ref{fig:convergence}) is therefore conservative for the fully-local case: it has twice the generation budget of the hybrid cases.
+
+\subsection{Final performance}
+
+Table~\ref{tab:results} lists the held-out spectral efficiency for the configurations, ordered by closeness to the paper's frontier closed-weight baseline (GPT-5.4).
+
+\begin{table*}[t]
+\centering
+\caption{Held-out spectral efficiency on the link adaptation task, ordered by closeness to the GPT-5.4 reference~\cite{aitaoudia2026aite}. ``Best gen'' is the generation in which the all-time-best (training-set) score was first achieved; ``Pos.\ \%'' is its position within the run's total generation budget.}
+\label{tab:results}
+\begin{tabular}{lllrrrrrr}
+\hline
+Configuration & Manager & Agents & Gens & Best gen & Pos.\ \% & Eval SE & vs OLLA & vs GPT-5.4 \\
+\hline
+GPT-5.4 (paper~\cite{aitaoudia2026aite}) & GPT-5.4 (cloud) & GPT-5.4 (cloud) & 10 & --- & --- & 3.5370 & $+3.43\%$ & --- \\
+\textbf{LA-F1 (hybrid)} & Opus 4.7 (cloud) & Gemma4-26B (local) & 10 & 9 & 100\% & \textbf{3.4618} & $+1.23\%$ & $-2.13\%$ \\
+\textbf{LA-G0 (hybrid)} & Opus 4.7 (cloud) & Qwen3-30B-A3B (local) & 10 & 9 & 100\% & \textbf{3.4434} & $+0.70\%$ & $-2.65\%$ \\
+OLLA (fine-tuned)~\cite{aitaoudia2026aite} & --- & --- & --- & --- & --- & 3.4196 & --- & $-3.32\%$ \\
+\textbf{LA-F0 (hybrid)} & Sonnet 4.6 (cloud) & Gemma4-26B (local) & 10 & 8 & 90\% & 3.4003 & $-0.56\%$ & $-3.87\%$ \\
+GPT-OSS 120B (paper~\cite{aitaoudia2026aite}) & GPT-OSS 120B (cloud) & GPT-OSS 120B (cloud) & 10 & --- & --- & 3.3976 & $-0.64\%$ & $-3.94\%$ \\
+LA-A1 (fully-local) & Gemma4-26B (local) & Gemma4-26B (local) & 20 & 14 & 75\% & 3.3680 & $-1.51\%$ & $-4.78\%$ \\
+\hline
+\end{tabular}
+\end{table*}
+
+Three observations follow. First, \emph{all hybrid configurations exceed the open-weight cloud baseline} (GPT-OSS 120B, 3.3976\,bps/Hz): the strong hybrid (Opus + Gemma4, LA-F1) by 1.9\,\%, the agent-varied hybrid (Opus + Qwen3, LA-G0) by 1.3\,\%, and even the lower-tier hybrid (Sonnet + Gemma4, LA-F0) is within 0.08\,\% of GPT-OSS 120B. Second, the hybrid configurations with the Opus manager (LA-F1 and LA-G0) also exceed the fine-tuned OLLA baseline, by 1.2\,\% and 0.7\,\% respectively, in ten generations. Third, the fully-local configuration (LA-A1, 3.3680) reaches within 1.5\,\% of OLLA in twenty generations, comparable to GPT-OSS 120B and showing that the gap between fully-local and hybrid is small but consistent --- a fully-local-only deployment is viable at slightly reduced performance and at the cost of more wall-clock time, whereas the hybrid recovers the remaining headroom at modest cloud cost.
+
+\subsection{Manager quality and convergence}
+
+The published paper~\cite{aitaoudia2026aite} reports only final scores for the link adaptation task. Fig.~\ref{fig:convergence} shows the first per-generation convergence analysis for this task, comparing three configurations that hold the agent constant (Gemma4-26B) and vary only the manager: fully-local Gemma4, Sonnet~4.6, and Opus~4.7.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\columnwidth]{fig2-convergence}
+\caption{Convergence on the link adaptation task with the agent model held constant (Gemma4-26B-A4B-it). Top: best training-set spectral efficiency per generation. Bottom: agent success rate per generation. Horizontal reference lines mark OLLA, GPT-OSS 120B, and GPT-5.4~\cite{aitaoudia2026aite}.}
+\label{fig:convergence}
+\end{figure}
+
+Three findings emerge. First, manager quality affects the \emph{score ceiling}: LA-F1 reaches 3.077\,bps/Hz, LA-F0 reaches 3.015, and LA-A0 reaches 2.989 over twenty generations. Second, manager quality affects the \emph{agent success rate} (lower panel of Fig.~\ref{fig:convergence}): under the Opus manager, 9--10 of 10 agents per generation produce a working solution from generation 3 onward, whereas under Sonnet the success rate oscillates between 0 and 7 of 10, and under the local Gemma4 manager between 1 and 10 with two collapses. Crucially, the agent model is held constant across these three configurations: the differences are attributable to the quality of the ideas the manager proposes, not to differences in coding ability among the agents. Third, and arguably the most consequential finding for practitioners, manager quality affects the \emph{convergence speed} --- the number of generations needed to approach the ceiling. The Opus manager exceeds 3.05\,bps/Hz by generation 3; the Sonnet manager by generation 8; the local Gemma4 manager only by generation 18. The generation budget compresses by approximately a factor of six between the strongest and weakest manager. Because each generation consumes a fixed wall-clock window (we measure 32--34 minutes per generation across all configurations, dominated by the per-agent 900\,s timeout), a higher-quality manager shortens the entire algorithm-discovery run by hours rather than reducing only the final score.
+
+\subsection{Cloud token economy}
+
+The structural asymmetry between manager and agent traffic (Section~\ref{sec:hybrid}) translates into a substantial cloud-cost gap relative to a fully-cloud deployment. Table~\ref{tab:tokens} reports the measured cloud token consumption for the two hybrid runs alongside an estimate for a corresponding fully-cloud configuration.
+
+\begin{table}[t]
+\centering
+\caption{Cloud token consumption for the link adaptation case study (10-generation run).}
+\label{tab:tokens}
+\begin{tabular}{lrrr}
+\hline
+Deployment & Manager tokens & Agent tokens & Total cloud \\
+\hline
+Hybrid F0 (measured) & 338\,K & 0 (local) & 338\,K \\
+Hybrid F1 (measured) & 538\,K & 0 (local) & 538\,K \\
+Fully-cloud F0-equiv.\ (estimated) & 338\,K & $\sim$2.5\,M & $\sim$2.8\,M \\
+Fully-cloud F1-equiv.\ (estimated) & 538\,K & $\sim$2.5\,M & $\sim$3.0\,M \\
+\hline
+\end{tabular}
+\end{table}
+
+Manager tokens are measured directly from the Anthropic API usage export; agent tokens for the hybrid deployment are zero (vLLM-local) and for the fully-cloud estimate are derived from the total number of agent LLM calls observed in the journal logs (554 across all agents in LA-F0; 355 in LA-F1) multiplied by an average per-call input context of 4--8\,K tokens. The hybrid deployment consumes approximately 6--10\,$\times$ fewer cloud tokens than the corresponding fully-cloud configuration. The asymmetry is structural rather than provider-specific: the manager role requires $O(\text{generations} \cdot \text{agents})$ short calls with moderate context, while the agent role requires $O(\text{generations} \cdot \text{agents} \cdot \text{turns/agent})$ calls with large, growing contexts. At Anthropic's May 2026 pricing, the measured manager cost was \$0.20 for the LA-F0 run and \$1.48 for the LA-F1 run, while the fully-cloud equivalent would cost an estimated \$3--\$4 per 10-generation run.
+
+The combination of these three findings --- competitive performance against the frontier baseline, sharply lower cloud token consumption, and 6\,$\times$ convergence compression --- argues that the hybrid deployment is not a minor engineering choice but the natural default for agentic wireless algorithm discovery at workstation scale.
+
+% ============================================================
+\section{Choosing the Local Agent Model}
+\label{sec:agentmodel}
+
+The hybrid deployment depends on a competent local agent model, but ``competent'' is not a single number. The two open-weight MoE candidates we evaluated --- Gemma4-26B-A4B (4\,B active parameters, BF16, $\sim$48\,GB) and Qwen3-30B-A3B (3\,B active, FP8, $\sim$30\,GB) --- differ enough in their inference behaviour that the choice between them is worth a separate look.
+
+\subsection{The four-way grid}
+
+Table~\ref{tab:grid} arranges the four configurations of \{local Gemma4, cloud Opus\} manager $\times$ \{Gemma4, Qwen3\} agent. The same generation-and-agent count applies (ten generations except for the fully-local runs, which are twenty). We report training-set best scores for the grid because the held-out evaluation of the fully-local Qwen3-agent configuration (LA-B0) would not affect the qualitative conclusion: its training-set best is already an order of magnitude below the other three cells.
+
+\begin{table}[t]
+\centering
+\caption{Manager $\times$ agent grid: training-set best spectral efficiency (bps/Hz).}
+\label{tab:grid}
+\begin{tabular}{lcc}
+\hline
+                                  & Gemma4-26B agents        & Qwen3-30B agents \\
+\hline
+Local Gemma4-26B manager          & 2.989 (LA-A0, 20 gen)    & 0.868 (LA-B0, 20 gen) \\
+Cloud Opus 4.7 manager            & 3.077 (LA-F1, 10 gen)    & 3.065 (LA-G0, 10 gen) \\
+\hline
+\end{tabular}
+\end{table}
+
+Two observations dominate the grid. First, the Qwen3 agents perform almost identically to the Gemma4 agents under the Opus manager: 3.065 versus 3.077 on the training metric, a 0.4\,\% gap that reduces to 0.5\,\% on the held-out evaluation set (3.4434 vs.\ 3.4618 in Table~\ref{tab:results}). Second, the Qwen3 agents collapse under the local Gemma4 manager: their best score is below 1\,bps/Hz across twenty generations, far below what either agent model produces in any other cell. The agent model choice is roughly independent of the manager in the top row of Table~\ref{tab:grid}, but dependent on the manager in the bottom-left versus top-left transition --- a non-trivial interaction that we examine next.
+
+\subsection{Success rate is not quality}
+
+The two agent models differ markedly in how they consume the 900-second per-agent budget, in a way that is initially counter-intuitive. Gemma4-26B agents make few, long LLM calls: 9--15 tool calls per agent over 900\,s, with each call internally reasoning for tens of seconds before emitting a tool invocation. Qwen3-30B agents (with the thinking-mode template disabled to suppress 20K-token chain-of-thought blocks that would otherwise time out the agent) make many, short calls: 46--56 tool calls per agent at roughly 11\,s per call, iterating rapidly between code edits and the evaluator. Within a generation, the Qwen3 agents produce \emph{higher} per-generation success rates than Gemma4 (frequently 9--10 of 10 versus Gemma4's typical 4--7 of 10) yet do not improve on Gemma4's score ceiling and significantly underperform it when the manager is weak.
+
+The interpretation we draw, supported by inspection of the agent journals, is that Qwen3's many-short-calls behaviour is well-suited to fixing implementation defects rapidly (driving up the success rate) but less suited to the deeper algorithmic synthesis that produces the highest-scoring strategies. Under a weak manager that proposes generic ideas, Qwen3 implements those generic ideas more reliably than Gemma4 does but reaches the same uninspired ceiling --- and in the fully-local case (LA-B0), that ceiling sits well below OLLA because the manager itself never proposes the calibration logic that a competitive controller requires. Under a strong manager that proposes well-calibrated ideas, both agent models reach the manager's ceiling. The agent's success rate is therefore a useful proxy for implementation reliability but not for final-score competitiveness; the right question to ask of an agent model is not ``how often does it produce working code'' but ``how often does it produce working code that retains the substance of a strong idea.''
+
+\subsection{A caveat on the call-pattern comparison}
+
+The latency-per-call gap between the two agents conflates two distinct levers: model architecture (4\,B vs 3\,B active parameters at BF16 vs FP8) and the use of an internal reasoning/``thinking'' phase before each tool emission. Gemma4 agents emit a thinking trace per turn that the framework's journal records as an empty channel marker but whose underlying text consumes the bulk of the per-call wall-clock time; Qwen3 agents, by contrast, are served with a chat template that pre-fills an empty thinking block at the start of every assistant turn, short-circuiting the reasoning phase. The Qwen3 thinking-suppression step is not optional in our setup: leaving the default template in place caused Qwen3 to emit 20\,K+ token chain-of-thought blocks per turn and almost universally exceeded the 900\,s per-agent timeout before any tool call completed. We did not run a complementary experiment with Gemma4 thinking suppressed, so the per-call latency numbers we report are the appropriate operating points for each model rather than a controlled isolation of architecture from thinking mode.
+
+We emphasise that this article evaluates the two models' appropriateness as agents for \emph{this specific use case} --- a 900-second-budget code-write--evaluate loop on a constrained algorithmic task --- not their general capability. Qwen3 with thinking enabled may well dominate Gemma4 on tasks where extended in-context reasoning is on the critical path and the per-turn budget is generous; for the agentic optimisation loop described here, the operating point that suits Qwen3 is one in which thinking is off. The practical implication is that an agent model's \emph{configured inference profile}, not its theoretical capability ceiling, is what determines whether it slots cleanly into this framework.
+
+\subsection{Practitioner guidance}
+
+If forced to choose between two compact agent models at a similar memory footprint, we would prioritise active-parameter count and code-generation benchmark scores over per-call latency. In our setup the larger-active model (Gemma4, 4\,B active) outperforms the smaller-active model (Qwen3, 3\,B active) under both managers, by a small margin under the strong manager and by a large margin under the weak one. The first margin is too small to matter for many practical deployments, but the second --- the cliff-edge collapse of the Qwen3-only configuration --- argues against assuming that agent model quality is irrelevant when a stronger manager is unavailable. The two-step heuristic we suggest for a new deployment is: prioritise a strong manager (cloud or open-weight, as budget permits); then choose the largest compact agent model that fits the platform's headroom-aware memory budget (see Section~\ref{sec:hwlandscape}).
+
+% ============================================================
+\section{Open Challenges and Outlook}
+\label{sec:open}
+
+The deployment we have described is, in our view, a usable starting point rather than an endpoint. Several constraints remain that the community will need to address as agentic algorithm discovery scales beyond proof-of-concept tasks.
+
+\textbf{GPU-in-container barrier.} The link adaptation task evaluates CPU-only, which is what makes it tractable on a workstation that simultaneously serves an LLM on its GPU. The framework's two other tasks --- statistics-agnostic and known-covariance channel estimation~\cite{aitaoudia2026aite} --- evaluate inside the agent container with Sionna~\cite{sionna}, which requires GPU access from every parallel agent. On a single-GPU workstation this contends with the local vLLM endpoint. Multi-GPU workstations relieve the contention; equally, lighter-weight evaluation backends or a separate evaluator host that the workstation orchestrates would extend the architecture to GPU-bound tasks without sacrificing the deployment's other properties.
+
+\textbf{Single-task scope.} Our case study restricts attention to one of the framework's three tasks. The original paper~\cite{aitaoudia2026aite} does not claim its task set is representative of wireless algorithm discovery broadly, and we make no stronger claim. The manager--agent traffic asymmetry that drives our cost finding is, however, structural: as long as the framework architecture is preserved, the asymmetry holds across tasks of similar agent-turn complexity. The convergence-speed-by-manager finding is more task-dependent; replication on the channel estimation tasks --- once the GPU-in-container barrier above is addressed --- would strengthen it.
+
+\textbf{Context-window growth on long horizons.} The manager's input context grows by approximately $500$--$1000$ tokens per generation as accumulated results and per-agent summaries are fed forward. Twenty generations remain comfortably within an open-weight manager's 32\,K--40\,K context window; beyond approximately twenty-five generations the manager begins to truncate or refuse history-dependent prompts. Cloud managers in the $200$\,K-class tolerate longer horizons natively but pay token cost that grows with input size.
+
+An empirical observation motivates taking the long-horizon case seriously. Across our eight completed link adaptation runs, the generation at which the all-time-best score was first achieved sits in the top quartile of the run's generation budget in six of eight cases, and at the \emph{last} available generation in three cases including the two headline hybrid runs (LA-F1 at gen 9 of 10, LA-G0 at gen 9 of 10). The pattern is consistent: improvements continue arriving at the budget boundary, suggesting that a longer budget would in many cases unlock further gains. Where the manager is a context-limited open-weight model, a bounded knowledge state is what enables that budget to be extended past the 32\,K wall without truncation.
+
+An active manager-driven \emph{context consolidation} step --- in which the manager periodically compresses the cumulative history into a bounded knowledge state --- has been the operating mode for every result reported in this article. \tbd{LA-F2 ablation pending (Opus + Gemma4-26B, no consolidation, 10 generations); result expected within hours of revision; will quantify whether consolidation as currently configured affects final spectral efficiency or whether it is purely infrastructure for longer horizons.}
+
+\textbf{Privacy-sensitive deployments.} The hybrid architecture limits cloud traffic to the manager's distilled outputs --- idea proposals and short agent summaries --- and never sends full agent journals, source code, or evaluator outputs to the cloud. For deployments where task descriptions or per-trajectory channel data carry confidentiality constraints (e.g.\ operator-owned measurement campaigns), this matters in practice. A fully-local variant in which the manager too is open-weight is feasible at the cost of weaker convergence-speed performance (see Section~\ref{sec:case}); the hybrid design provides a tunable point on that trade-off.
+
+\textbf{Beyond per-task discovery.} The frameworks discussed here treat each task in isolation. A natural extension is a \emph{library} of solutions: the manager accumulates not just the current run's results but the best algorithms discovered across prior tasks and selects, recombines, or adapts them on a new task. The deployment requirements remain those of this article: the workhorse compute is in the agent's implementation iterations, where it stays affordable; the strategic synthesis is in the manager, where the cloud cost remains bounded.
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+LLM-based wireless algorithm discovery does not require a multi-GPU cluster or a substantial cloud bill. Splitting the agentic loop along its natural traffic asymmetry --- a frontier cloud LLM for the sparse manager role, a compact open-weight model on a single workstation for the dense agent role --- exceeds the strong OLLA and open-weight cloud baselines for this task, lands within 2.1\,\% of the frontier closed-weight cloud result, and does so at approximately an order of magnitude lower cloud token consumption. The same decomposition surfaces a finding the original paper~\cite{aitaoudia2026aite} did not report: manager model quality compresses the generation budget needed to converge, not just the score it converges to. We see the hybrid deployment less as a new architecture and more as a practical recipe: a way to bring agentic algorithm design into the reach of any wireless research group with a workstation-class GPU and a modest API budget.
+
+% ============================================================
+\section*{Acknowledgements}
+The author thanks the team behind the AI Telco Engineer framework~\cite{aitaoudia2026aite} for releasing their code and task definitions, without which the comparisons in this article would not have been possible. \todo{add additional acknowledgements: funding sources, infrastructure providers, individuals as appropriate.}
+
+% ============================================================
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+% ============================================================
+\begin{IEEEbiography}
+[{\todo{author photo}}]
+{Jimmy J.~Nielsen}
+(S'09--M'13--SM'XX) is an Associate Professor with the Department of Electronic Systems, Aalborg University, Denmark. His research interests include reliable wireless communications, low-power IoT, and the application of machine learning and large language models to wireless system design.
+\end{IEEEbiography}
+
+\end{document}
