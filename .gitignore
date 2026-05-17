@@ -1,3 +1,47 @@
-api_doc_cache/
+# Runtime logs and process output
+*.log
+*.nohup.log
+nohup.out
+
+# Python cache
 __pycache__/
-**/workspaces/
+*.pyc
+*.pyo
+
+# macOS Finder
+.DS_Store
+
+# Per-agent workspace contents (large: journals, draft.py, .local pip installs,
+# seed-*, gen-*, all per-worker subdirectories under workspaces/)
+tasks/*/workspaces/*/
+tasks/*/workspaces/manager.log
+tasks/*/workspaces/run_traces*
+tasks/*/workspaces.failed_gen0/
+tasks/*/workspaces_run*/
+
+# Result binaries (regenerable)
+tasks/*/workspaces/**/result.npy
+
+# Exploratory analysis / per-machine config variants in cell_sleep_c0
+tasks/cell_sleep_c0/runs/
+tasks/cell_sleep_c0/draft.py
+tasks/cell_sleep_c0/utils.py
+tasks/cell_sleep_c0/*.png
+tasks/*/config.*.json
+tasks/*/config.json.bak
+
+# Per-run task directory boilerplate (duplicates of tasks/link_adaptation/ and
+# tasks/cell_sleep/ templates). Only config.json and workspace artifacts kept.
+tasks/link_adaptation_[a-z]*/eval/
+tasks/link_adaptation_[a-z]*/docker/
+tasks/link_adaptation_[a-z]*/prompt.md
+tasks/link_adaptation_[a-z]*/eval_tool.py
+tasks/link_adaptation_[a-z]*/evaluate_final.py
+tasks/link_adaptation_[a-z]*/visualize_results.ipynb
+tasks/link_adaptation_[a-z]*/__pycache__/
+tasks/cell_sleep_[a-z]*/eval/
+tasks/cell_sleep_[a-z]*/docker/
+tasks/cell_sleep_[a-z]*/prompt.md
+tasks/cell_sleep_[a-z]*/eval_tool.py
+tasks/cell_sleep_[a-z]*/visualize_results.ipynb
+tasks/cell_sleep_[a-z]*/__pycache__/
