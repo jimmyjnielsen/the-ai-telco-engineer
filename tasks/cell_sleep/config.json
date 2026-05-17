@@ -17,7 +17,6 @@
   "timeout": 1800,
   "task_submit_delay": 5.0,
   "prompt_path": "prompt.md",
-  // DGX Spark via SSH tunnel: ssh -f -N -L 11435:127.0.0.1:11434 connectivity2
   "agent_llm": {
     "model": "google/gemma-4-26B-A4B-it",
     "base_url": "http://localhost:8002/v1",
@@ -25,8 +24,8 @@
     "top_p": 0.95
   },
   "manager_llm": {
-    "model": "google/gemma-4-26B-A4B-it",
-    "base_url": "http://localhost:8002/v1",
+    "model": "nemotron-manager:latest",
+    "base_url": "http://localhost:11435/v1",
     "temperature": 0.0,
     "top_p": 0.95
   }

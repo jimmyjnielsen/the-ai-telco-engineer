@@ -15,6 +15,7 @@ Idea-driven optimization:
 import json
 import re
 import signal
+import os
 import time
 import numpy as np
 import multiprocessing as mp
@@ -285,6 +286,7 @@ Each element is an object with:
 Example for n=2:
 [{{"description": "Enumerate candidate solutions and evaluate each; keep the best.", "reference_workspaces": "gen00-0001, gen00-0003"}}, {{"description": "Build the solution step by step with a local greedy rule."}}]
 
+{plateau_clause}
 Your response (JSON array only):"""
 
     SUMMARIZE_PROMPT = """You are summarizing a single implementation for a research coordinator. There is no prior conversation: use only the information below.
@@ -305,6 +307,40 @@ Your response (JSON array only):"""
 In 2–4 sentences, summarize: (1) what approach/techniques were used in the code, and (2) how they align with or deviate from the assigned idea. No preamble or meta-commentary.
 
 Reply with **only** a JSON object with one key: "summary" (the summary text). Example: {{"summary": "The code implements ..."}}"""
+
+
+    CONSOLIDATE_PROMPT = """You are maintaining a running knowledge state for an iterative optimisation experiment. Update the state below to incorporate findings from the latest generation.
+
+## Current knowledge state
+{knowledge_state}
+
+## Results from generation {generation}
+{generation_results}
+
+## Instructions
+Produce an updated knowledge state using EXACTLY this structure (600-900 tokens total):
+
+### Best approaches (metric >= 2.5)
+List each: [name] - [1-sentence mechanism] - best score: X.XXX
+
+### Moderate approaches (metric 1.0-2.5)
+List each: [name] - [1-sentence mechanism] - best score: X.XXX
+
+### Implementation failures (score N/A or <1.0, but algorithmically plausible)
+List each: [name] - [why it likely failed to implement, not why the algorithm is wrong]
+These may be worth retrying with a simpler implementation.
+
+### Algorithmic dead ends (fundamentally unsuitable for this task)
+List each: [name] - [1-sentence reason it cannot work for this task]
+
+### Unexplored territory
+List 2-4 specific algorithmic directions not yet attempted.
+
+Rules:
+- Preserve all approaches with metric >= 2.0; do not discard them.
+- Distinguish implementation failure (agent timed out or BLER violated on first attempt) from algorithmic failure (approach cannot satisfy constraints by design).
+- Keep mechanism descriptions, not just names and scores.
+- Reply with ONLY the structured knowledge state (no preamble, no JSON):"""
 
     def __init__(self, config: Config,
                  evaluation_tool_type: type[ToolProvider],
@@ -346,6 +382,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
         self.tool_factory_type = tool_factory_type
         # workspace_id -> (cluster_id, idea_description) for current generation
         self._workspace_to_idea: dict[str, tuple[int, str]] = {}
+        self._knowledge_state: str = ""  # Consolidated history; bounded regardless of run length
 
     @property
     def _host_workspace_path(self) -> Path:
@@ -358,6 +395,10 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
     @property
     def _manager_log_path(self) -> Path:
         return self._host_workspace_path / "manager.log"
+
+    @property
+    def _knowledge_state_path(self) -> Path:
+        return self._host_workspace_path / "knowledge_state.md"
 
     def __enter__(self):
         """Context manager entry - starts worker processes."""
@@ -454,6 +495,10 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
                 start_generation = 0
                 self._candidate_counter = 0
 
+            _ks_path = self._host_workspace_path / 'knowledge_state.md'
+            if _ks_path.exists():
+                self._knowledge_state = _ks_path.read_text()
+                printer.log(f'Loaded existing knowledge state ({len(self._knowledge_state)} chars)')
             return self._run(
                 query=self.prompt,
                 leaderboard=leaderboard,
@@ -525,12 +570,15 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
             leaderboard.save(self._leaderboard_path)
         ideas: list[tuple[int, str, list[str]]] = []  # (cluster_id, idea_description, ref_workspace_ids)
         self._all_gen_summaries: list[tuple[int, int, str, str, float, str]] = []  # (generation, cluster_id, idea_desc, summary, metric, workspace_id)
+        _best_per_gen: list[float] = []  # tracks best metric per generation for plateau detection
+        _gens_without_improvement: int = 0
 
         # Run generations
         for gen_offset in range(num_generations):
             generation = start_generation + gen_offset
 
             printer.section("", "=" * 60, f"Generation {generation}", "=" * 60, "")
+            _gen_start_t = time.time()
 
             # Use initial ideas only for gen 0 or first gen after resume (_all_gen_summaries empty then)
             use_initial_ideas = (
@@ -538,13 +586,16 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
                 or (is_continuation and generation == start_generation and not self._all_gen_summaries)
             )
             try:
+                _ideas_t0 = time.time()
                 if use_initial_ideas:
                     descriptions = self._generate_initial_ideas(query, num_ideas)
                     refs_per_idea: list[list[str]] = [[] for _ in descriptions]
                 else:
                     descriptions, refs_per_idea = self._generate_ideas_from_results(
-                        self._all_gen_summaries, num_ideas, query
+                        self._all_gen_summaries, num_ideas, query,
+                        generations_without_improvement=_gens_without_improvement,
                     )
+                printer.log("TIMING: idea generation {:.1f}s".format(time.time() - _ideas_t0))
             except Exception as e:
                 phase = "initial ideas" if use_initial_ideas else "ideas from previous results"
                 printer.log(f"ERROR: Manager LLM failed to generate {phase}: {e}")
@@ -578,7 +629,28 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
                 printer.log("Stopping optimization.")
                 break
 
+            _agents_elapsed = time.time() - _gen_start_t
+            printer.log("TIMING: generation {} wall-clock {:.1f}s ({:.1f} min)".format(
+                generation, _agents_elapsed, _agents_elapsed / 60))
             self._print_generation_summary(leaderboard, generation)
+
+            # Update plateau counter
+            gen_candidates = [c for c in leaderboard.get_all_candidates() if c.generation == generation]
+            if gen_candidates:
+                gen_best = max(c.metric for c in gen_candidates) if self.config.higher_is_better \
+                           else min(c.metric for c in gen_candidates)
+                if _best_per_gen and (
+                    (self.config.higher_is_better and gen_best <= max(_best_per_gen)) or
+                    (not self.config.higher_is_better and gen_best >= min(_best_per_gen))
+                ):
+                    _gens_without_improvement += 1
+                else:
+                    _gens_without_improvement = 0
+                _best_per_gen.append(gen_best)
+
+            # Consolidate history into bounded knowledge state (env-gated)
+            if os.environ.get("DISABLE_CONSOLIDATION") != "1":
+                self._consolidate_knowledge(generation)
 
         self._print_final_summary(leaderboard)
         return leaderboard
@@ -586,7 +658,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
     def _get_manager_llm(self) -> ChatOpenAI:
         """Get or create the LLM used for generating ideas and summarizing solutions."""
         if self._manager_llm is None:
-            config_dict = asdict(self.config.manager_llm)
+            config_dict = {k: v for k, v in asdict(self.config.manager_llm).items() if v is not None}
             self._manager_llm = ChatOpenAI(**config_dict)
         return self._manager_llm
 
@@ -641,6 +713,42 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
         with open(self._manager_log_path, "a", encoding="utf-8") as f:
             f.write(f"\n{'='*60}\n[{role}]\n{content}\n")
 
+    def _consolidate_knowledge(self, generation: int) -> None:
+        """Compress this generation's summaries into a bounded knowledge state."""
+        gen_summaries = [
+            (cid, desc, summary, metric, ws_id)
+            for g, cid, desc, summary, metric, ws_id in self._all_gen_summaries
+            if g == generation
+        ]
+        if not gen_summaries:
+            return
+        seen: set[int] = set()
+        gen_lines: list[str] = []
+        for cid, desc, summary, metric, ws_id in gen_summaries:
+            if cid not in seen:
+                seen.add(cid)
+                gen_lines.append(f"  Idea [{cid}]: {desc}")
+            gen_lines.append(f"    {ws_id}: {summary}; metric={metric:.4f}")
+        generation_results = "\n".join(gen_lines)
+        prompt = self.CONSOLIDATE_PROMPT.format(
+            knowledge_state=self._knowledge_state or "(empty — first consolidation)",
+            generation=generation,
+            generation_results=generation_results,
+        )
+        self._log_manager(f"PROMPT (consolidate gen {generation})", prompt)
+        try:
+            llm = self._get_manager_llm()
+            _consol_t0 = time.time()
+            response = invoke_llm_with_retry(llm, prompt, context=f"consolidate gen {generation}")
+            self._knowledge_state = response.content.strip()
+            printer.log("TIMING: consolidation {:.1f}s".format(time.time() - _consol_t0))
+            self._log_manager(f"RESPONSE (consolidate gen {generation})", self._knowledge_state)
+            self._knowledge_state_path.parent.mkdir(parents=True, exist_ok=True)
+            self._knowledge_state_path.write_text(self._knowledge_state)
+        except Exception as e:
+            self._log_manager(f"WARN (consolidate gen {generation})", str(e))
+            # Consolidation failed — fall back to full history on next generation
+
     def _generate_initial_ideas(self, query: str, n: int) -> list[str]:
         """Ask manager LLM for n initial ideas from the task query. Returns list of descriptions.
 
@@ -671,7 +779,9 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
             code=code
         )
         self._log_manager("PROMPT (summarize)", prompt)
+        _summary_t0 = time.time()
         response = invoke_llm_with_retry(llm, prompt, context="summarize")
+        printer.log("TIMING: summary call {:.1f}s".format(time.time() - _summary_t0))
         content = response.content.strip() or "No summary."
         self._log_manager("RESPONSE (summarize)", content)
         summary = self._parse_summary_json(content)
@@ -681,6 +791,7 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
                                      all_gen_summaries: list[tuple[int, int, str, str, float, str]],
                                      n: int,
                                      query: str = "",
+                                     generations_without_improvement: int = 0,
                                      ) -> tuple[list[str], list[list[str]]]:
         """Generate ideas from all previous generation summaries. Returns (descriptions, ref_workspace_ids per idea)."""
         # all_gen_summaries: (generation, cluster_id, idea_desc, summary, metric, workspace_id)
@@ -694,8 +805,19 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
                 by_gen[generation][cluster_id] = []
             by_gen[generation][cluster_id].append((summary, metric, workspace_id))
 
+        # If a knowledge state exists, use it + only the latest generation's data.
+        # Otherwise fall back to full history (first generation or consolidation disabled).
+        latest_gen = max(by_gen.keys()) if by_gen else -1
         results_lines = []
-        for generation in sorted(by_gen.keys()):
+        if self._knowledge_state and latest_gen >= 0:
+            results_lines.append("## Accumulated knowledge (consolidated):")
+            results_lines.append(self._knowledge_state)
+            results_lines.append("")
+            results_lines.append(f"## Latest generation ({latest_gen}) — raw results:")
+            gens_to_show = {latest_gen}
+        else:
+            gens_to_show = set(by_gen.keys())
+        for generation in sorted(gens_to_show):
             results_lines.append(f"=== Generation {generation} ===")
             for cluster_id, pairs in by_gen[generation].items():
                 desc = idea_descriptions.get(cluster_id, "")
@@ -715,11 +837,22 @@ Reply with **only** a JSON object with one key: "summary" (the summary text). Ex
             else "Lower metric values are better (e.g. loss, error rate)."
         )
         llm = self._get_manager_llm()
+        if generations_without_improvement >= 3:
+            plateau_clause = (
+                f"\n\u26a0\ufe0f DIVERSITY REQUIRED: The best score has not improved for "
+                f"{generations_without_improvement} consecutive generations. "
+                "You MUST propose at least one approach from a completely different "
+                "algorithmic family than any previously tried. "
+                "Do not propose refinements of approaches that have already plateaued."
+            )
+        else:
+            plateau_clause = ""
         prompt = self.IDEAS_FROM_RESULTS_PROMPT.format(
             n=n,
             query=query,
             metric_direction=metric_direction,
             results_text="\n".join(results_lines),
+            plateau_clause=plateau_clause,
         )
         self._log_manager("PROMPT (ideas from results)", prompt)
         response = invoke_llm_with_retry(llm, prompt, context="ideas from results")

@@ -157,8 +157,8 @@ def load_config(config_path: Union[str, Path]) -> Config:
         api_key=api_key,
         base_url=manager_llm_section.get("base_url", ""),
         model=manager_llm_section.get("model", ""),
-        temperature=manager_llm_section.get("temperature", 0.0),
-        top_p=manager_llm_section.get("top_p", 0.95),
+        temperature=manager_llm_section.get("temperature", None),
+        top_p=manager_llm_section.get("top_p", None),
         model_kwargs=manager_llm_section.get("model_kwargs", {}),
     )
 

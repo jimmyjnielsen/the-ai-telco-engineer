@@ -141,45 +141,12 @@ scenario:
 
 The reported metric is the **average net savings (%) across the three scenarios**.
 
-Reference values:
+Reference values (for **OFFLOAD_OVERHEAD = 2.0**):
 - **0 %** — always active (no savings, no switching cost)
-- **~15–22 %** — naive / poorly-tuned implementations
-- **~28–32 %** — good temporal policy (near-oracle for this traffic and overhead model)
-- **> 33 %** — oracle bound (theoretical maximum with perfect future knowledge, no transition cost)
-
-## Suggested approaches
-
-Use **one** of the following. All of them rely on temporal commitment, not per-step greedy.
-
-1. **Precomputed valid sleep sets + hysteresis streak.** At startup, enumerate all 2^7
-   configurations that satisfy the coverage constraint (a small fixed set given the
-   hex topology). At each step, check the overload constraint only over this pre-filtered
-   list. Track how many consecutive steps each configuration has been feasible. Pick the
-   configuration with the most sleeping cells whose feasibility streak is ≥ k (e.g. k=3).
-   This prevents rapid switching because a config must be continuously safe for k steps
-   before it is adopted.
-
-2. **Circadian schedule with reactive guard.** The traffic follows a 24 h sinusoidal
-   pattern, so low-traffic periods are predictable. Identify the low-traffic window from
-   the first few steps and sleep aggressively during it (only ~2 transitions per cell per
-   day). Outside low-traffic hours fall back to a conservative threshold policy.
-
-3. **Center-biased hysteresis.** Keep cell 0 (centre) active at all times — it neighbours
-   all 6 ring cells and acts as a universal offload sink. For each ring cell, maintain a
-   persistent sleep/wake state: sleep the cell when its own load is below a low threshold
-   (e.g. 0.55) AND active neighbours can absorb its traffic below 0.76; wake it only when
-   load rises above a high threshold (e.g. 0.70). The two-threshold hysteresis means the
-   cell stays asleep through brief load spikes, making decisions stable across many steps.
-   Store per-cell state with `if not hasattr(sleep_policy, 'state'): sleep_policy.state = {}`.
-   Note: with OFFLOAD_OVERHEAD = 2.0, each sleeping cell's traffic contributes 2× to its
-   active neighbours, so the feasibility window is tighter than it appears — use a generous
-   internal margin (≤ 0.76) relative to the hard limit (0.80).
-
-4. **Minimum sleep duration commitment.** Once you decide to sleep a cell, commit to
-   keeping it asleep for at least `min_sleep = 6` steps before reconsidering. The
-   switching cost makes short sleep bouts actively harmful (a 2-step sleep incurs penalty
-   4 for only 2 benefit). A minimum commitment converts a noisy reactive policy into a
-   stable one without losing much flexibility.
+- **~10–22 %** — naive / poorly-tuned implementations
+- **~28–33 %** — good temporal policy
+- **~33.5 %** — hand-crafted reference implementation (seeded in `workspaces/seed/`)
+- **~35 %** — oracle bound (theoretical maximum with perfect future knowledge, no transition cost)
 
 ## CRITICAL: Hysteresis on waking — the key to high scores
 
@@ -242,6 +209,58 @@ recovers within WAKE_PATIENCE steps costs zero transitions.
 
 Combined with a sleep-upgrade stability requirement (k ≥ 5 feasible steps before
 adopting a more aggressive config), this produces stable, long sleep bouts.
+
+## Avoiding common implementation bugs
+
+### own_load recovery: don't forget the neighbour filter
+
+When recovering own (base) loads from `traffic_loads`, the sum runs only over
+**neighbours of cell i that were sleeping** — not all sleeping cells in the network.
+Missing this filter is the most common bug: it incorrectly subtracts traffic from
+unrelated cells and produces garbage own_load values.
+
+```python
+OFFLOAD_OVERHEAD = 2.0
+N = len(traffic_loads)
+own_load = np.zeros(N)
+for i in range(N):
+    if prev_active[i] == 0:          # cell i was sleeping → own load = its traffic
+        own_load[i] = traffic_loads[i]
+    else:                             # cell i was active → subtract what was offloaded TO it
+        own_load[i] = traffic_loads[i]
+        for j in range(N):
+            # MUST check both: j is a neighbour of i, AND j was sleeping
+            if neighbor_matrix[i, j] == 1 and prev_active[j] == 0:
+                active_nbrs_j = int(np.sum(neighbor_matrix[j] * prev_active))
+                if active_nbrs_j > 0:
+                    own_load[i] -= traffic_loads[j] * OFFLOAD_OVERHEAD / active_nbrs_j
+```
+
+### Checking whether the *current* config is overloaded
+
+You do **not** need own_load recovery for this. `traffic_loads[i]` already is the
+effective load of active cell i under the **previous** configuration. Just read it:
+
+```python
+# Is the current (prev_active) configuration overloaded?
+for i in range(N):
+    if prev_active[i] == 1 and traffic_loads[i] > HARD_LIMIT:
+        # current config is overloaded at cell i → must step down immediately
+```
+
+Only use the own_load recovery formula when evaluating a **candidate new config**
+that differs from `prev_active`.
+
+### Fallback config must not overload
+
+When no candidate config has a long-enough feasibility streak, **do not fall back to
+the config that sleeps the most cells** — that config may be infeasible and will cause
+an immediate FAILURE.  The safe fallback is always `all-active` (1s for every cell):
+
+```python
+if not candidates:
+    return np.ones(N, dtype=np.int32)   # safe fallback: all cells active
+```
 
 ## Tips
 
