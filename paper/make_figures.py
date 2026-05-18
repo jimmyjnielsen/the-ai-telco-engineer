@@ -55,28 +55,40 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 # ═══════════════════════════════════════════════════════════════════════
 
 def load_per_generation(task_dir: str):
-    """Return (gens, running_best, success_rate) arrays from a leaderboard.json."""
-    lb_path = REPO / "tasks" / task_dir / "workspaces" / "leaderboard.json"
-    with open(lb_path) as f:
-        data = json.load(f)
-    candidates = [c for cluster in data["clusters"].values() for c in cluster]
+    """Return (gens, eval_best, success_rate) arrays.
 
+    eval_best is the held-out-set spectral efficiency of the running-best
+    workspace at each generation (by training metric). Values are read from
+    paper/figures/per_gen_eval_se.json, which is produced by
+    /tmp/per_gen_eval.py running evaluate_final.py on each unique running-
+    best workspace. The success_rate is derived directly from the leaderboard.
+    """
+    # success_rate from leaderboard
+    lb_path = REPO / "tasks" / task_dir / "workspaces" / "leaderboard.json"
+    data = json.load(open(lb_path))
+    candidates = [c for cluster in data["clusters"].values() for c in cluster]
     by_gen: dict[int, list[dict]] = {}
     for c in candidates:
         by_gen.setdefault(c["generation"], []).append(c)
+    max_gen = max(by_gen) if by_gen else -1
 
-    gens = sorted(by_gen)
-    best_per_gen = []
-    success_per_gen = []
-    running = float("-inf")
-    for g in gens:
-        cands = by_gen[g]
-        successful = [c["metric"] for c in cands if c["success"]]
-        if successful:
-            running = max(running, max(successful))
-        best_per_gen.append(running if running != float("-inf") else np.nan)
-        success_per_gen.append(len(successful) / max(len(cands), 1))
-    return np.array(gens), np.array(best_per_gen), np.array(success_per_gen)
+    # eval_best from per_gen_eval_se.json
+    eval_json = json.load(open(REPO / "paper" / "figures" / "per_gen_eval_se.json"))
+    entry = next((v for v in eval_json.values() if v["task_dir"] == task_dir), None)
+    if entry is None:
+        raise RuntimeError(f"No per-gen eval data for {task_dir}; re-run per_gen_eval.py")
+
+    gens = []
+    eval_best = []
+    success_rate = []
+    for row in entry["per_gen"]:
+        g, ws, train_metric, eval_se = row
+        gens.append(g)
+        eval_best.append(eval_se if eval_se is not None else np.nan)
+        succ_count = sum(1 for c in by_gen.get(g, []) if c.get("success"))
+        total = len(by_gen.get(g, [])) or 1
+        success_rate.append(succ_count / total)
+    return np.array(gens), np.array(eval_best), np.array(success_rate)
 
 
 def make_fig2():
@@ -93,11 +105,11 @@ def make_fig2():
         gridspec_kw={"height_ratios": [1.4, 1.0], "hspace": 0.10},
     )
 
-    # ── top: running-best, zoomed to where the action is ─────────────────
+    # ── top: running-best on eval scale, zoomed to where the action is ──
     for task_dir, label, color, marker, style in configs:
         gens, best, _ = load_per_generation(task_dir)
         # plot only points within the visible range
-        mask = best >= 2.3
+        mask = best >= 3.15
         ax_top.plot(gens[mask], best[mask], marker=marker, color=color,
                     linestyle=style, label=label)
 
@@ -111,9 +123,9 @@ def make_fig2():
                         xytext=(3, 0), textcoords="offset points",
                         fontsize=7, color="black", alpha=0.8, va="center", ha="left")
 
-    ax_top.set_ylabel("Best training SE (bps/Hz)")
-    ax_top.set_ylim(2.3, 3.65)
-    ax_top.set_yticks([2.4, 2.7, 3.0, 3.3, 3.6])
+    ax_top.set_ylabel("Eval-set SE (bps/Hz)")
+    ax_top.set_ylim(3.15, 3.65)
+    ax_top.set_yticks([3.2, 3.3, 3.4, 3.5, 3.6])
     ax_top.grid(True, alpha=0.25)
     ax_top.legend(loc="lower right", framealpha=0.95, frameon=True,
                   fancybox=False, edgecolor="black")
@@ -366,7 +378,7 @@ def make_fig4():
                     fontsize=6.5, color="black", alpha=0.8, va="center", ha="left")
 
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Best training SE (bps/Hz)")
+    ax.set_ylabel("Eval-set SE (bps/Hz)")
     ax.set_xlim(-0.5, 20.5)
     ax.set_xticks(range(0, 21, 4))
     ax.set_ylim(0.4, 3.65)
