@@ -8,6 +8,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Python venv (separate per machine; don't ship)
+venv/
+
 # macOS Finder
 .DS_Store
 
