@@ -206,7 +206,7 @@ The published paper~\cite{aitaoudia2026aite} reports only final scores for the l
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\columnwidth]{fig2-convergence}
-\caption{Convergence on the link adaptation task with the agent model held constant (Gemma4-26B-A4B-it) and the manager varying along a tier ladder: fully-local Gemma4-26B, fully-local Nemotron-H 123B Q4, Sonnet 4.6, and Opus 4.7. Top: held-out evaluation-set spectral efficiency of the running-best workspace at each generation. Bottom: agent success rate per generation. Horizontal reference lines mark OLLA, GPT-OSS 120B, and GPT-5.4~\cite{aitaoudia2026aite}.}
+\caption{Convergence on the link adaptation task with the agent model held constant (Gemma4-26B-A4B-it) and the manager varying along a tier ladder: fully-local Gemma4-26B, fully-local Nemotron-H 123B Q4, Sonnet 4.6, and Opus 4.7. Top: held-out evaluation-set spectral efficiency of the running-best workspace at each generation, where ``best'' is determined by the training metric; occasional dips occur when a workspace with a better training score generalises slightly less well to the held-out set. Bottom: agent success rate per generation. Horizontal reference lines mark OLLA, GPT-OSS 120B, and GPT-5.4~\cite{aitaoudia2026aite}.}
 \label{fig:convergence}
 \end{figure}
 
