@@ -10,7 +10,7 @@
   "higher_is_better": true,
   "population_size": 10,
   "num_ideas": 5,
-  "num_generations": 20,
+  "num_generations": 10,
   "tools_config": {
     "eval_timeout": 120
   },
