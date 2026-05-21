@@ -423,7 +423,7 @@ def make_fig5():
     ax_ctx.plot(g1c, t1, marker="o", color="tab:blue", linewidth=1.2, markersize=5, label="Op-G4")
     ax_ctx.axhline(32, color="black", linestyle="--", linewidth=0.6, alpha=0.55)
     ax_ctx.annotate("32K limit", xy=(0, 32), xycoords=("axes fraction", "data"),
-                    xytext=(4, -10), textcoords="offset points",
+                    xytext=(4, -3), textcoords="offset points",
                     fontsize=7, ha="left", va="top", alpha=0.8)
     ax_ctx.set_ylabel("Idea-generation prompt (K tokens)")
     ax_ctx.set_ylim(0, 45)
