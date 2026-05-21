@@ -393,8 +393,84 @@ def make_fig4():
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Figure 5 — Consolidation ablation: context growth (top) +
+#             running-best eval SE (bottom), Op-G4 vs Op-G4*
+# ═══════════════════════════════════════════════════════════════════════
+
+def make_fig5():
+    data = json.load(open(FIG_DIR / "context_growth.json"))
+    f1_ctx = data["F1_with_cons"]   # [(gen, chars), ...] gens 0..9
+    f2_ctx = data["F2_no_cons"]     # [(gen, chars), ...] gens 0..9
+
+    ref_data = json.load(open(FIG_DIR / "ref_oldest_gen.json"))
+    # rel_gen 0 has no refs; use gens 1-9
+    ref_gens_with_data = [d for d in ref_data if d["oldest_ref"] is not None]
+    rx = [d["rel_gen"] for d in ref_gens_with_data]
+    ry = [d["oldest_ref"] - 4 for d in ref_gens_with_data]  # normalise: gen04 -> 0
+
+    x_max = 9  # run 2 has 10 gens (0-9)
+
+    fig, (ax_ctx, ax_ref) = plt.subplots(
+        2, 1, figsize=(3.6, 4.8), sharex=True,
+        gridspec_kw={"hspace": 0.35},
+    )
+
+    # ── top: context growth ──────────────────────────────────────────────
+    g1c = [p[0] for p in f1_ctx]; t1 = [p[1] / 1000 for p in f1_ctx]
+    g2c = [p[0] for p in f2_ctx]; t2 = [p[1] / 1000 for p in f2_ctx]
+
+    ax_ctx.plot(g2c, t2, marker="s", color="tab:red",  linewidth=1.2, markersize=5, label="Op-G4*")
+    ax_ctx.plot(g1c, t1, marker="o", color="tab:blue", linewidth=1.2, markersize=5, label="Op-G4")
+    ax_ctx.axhline(32, color="black", linestyle="--", linewidth=0.6, alpha=0.55)
+    ax_ctx.annotate("32K limit", xy=(9.2, 32), xycoords="data",
+                    xytext=(0, 3), textcoords="offset points",
+                    fontsize=7, ha="right", va="bottom", alpha=0.8)
+    ax_ctx.set_ylabel("Manager context (K tokens)")
+    ax_ctx.set_ylim(0, 36)
+    ax_ctx.grid(True, alpha=0.25)
+    ax_ctx.legend(loc="upper left", framealpha=0.95, frameon=True,
+                  fancybox=False, edgecolor="black", fontsize=8, handletextpad=0.4)
+    ax_ctx.text(0.98, 0.04, "(a)", transform=ax_ctx.transAxes,
+                fontsize=9, fontweight="bold", va="bottom", ha="right")
+
+    # ── bottom: oldest referenced workspace generation (Op-G4* only) ────
+    ax_ref.step(rx, ry, where="post", color="tab:red", linewidth=1.5)
+    ax_ref.scatter(rx, ry, color="tab:red", s=30, zorder=4)
+
+    # Shade the "forgotten" region: everything older than oldest_ref
+    ax_ref.axvspan(7.5, x_max + 0.5, color="tab:red", alpha=0.08,
+                   label="context truncated")
+
+    # Mark the truncation boundary
+    ax_ref.axvline(7.5, color="black", linestyle="--", linewidth=0.6, alpha=0.55)
+    ax_ref.annotate("truncation\nbegins", xy=(7.5, 4.2), xycoords="data",
+                    xytext=(4, 0), textcoords="offset points",
+                    fontsize=6.5, ha="left", va="center", alpha=0.8)
+
+    # Label what gen04 represents
+    ax_ref.axhline(0, color="gray", linestyle=":", linewidth=0.6, alpha=0.5)
+    ax_ref.annotate("gen04\n(best early soln.)", xy=(0.02, 0.12),
+                    xycoords="axes fraction", fontsize=6.5, color="gray",
+                    va="bottom", ha="left", alpha=0.9)
+
+    ax_ref.set_xlabel("Generation (Op-G4*)")
+    ax_ref.set_ylabel("Oldest cited workspace\n(gens before run start)")
+    ax_ref.set_ylim(-0.5, x_max + 0.5)
+    ax_ref.set_yticks(range(0, x_max + 1, 2))
+    ax_ref.grid(True, alpha=0.25)
+    ax_ref.text(0.02, 0.97, "(b)", transform=ax_ref.transAxes,
+                fontsize=9, fontweight="bold", va="top")
+
+    fig.subplots_adjust(left=0.17, right=0.97, top=0.97, bottom=0.10)
+    fig.savefig(FIG_DIR / "fig5-consolidation-ablation.pdf")
+    fig.savefig(FIG_DIR / "fig5-consolidation-ablation.png")
+    print(f"Wrote {FIG_DIR}/fig5-consolidation-ablation.{{pdf,png}}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     make_fig1()
     make_fig2()
     make_fig3()
     make_fig4()
+    make_fig5()
