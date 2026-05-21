@@ -447,12 +447,6 @@ def make_fig5():
                     xytext=(4, 0), textcoords="offset points",
                     fontsize=6.5, ha="left", va="center", alpha=0.8)
 
-    # Label the run-start workspace (y=0 = first generation of run)
-    ax_ref.axhline(0, color="gray", linestyle=":", linewidth=0.6, alpha=0.5)
-    ax_ref.annotate("best workspace\n(from gen. 0)", xy=(0.02, 0.12),
-                    xycoords="axes fraction", fontsize=6.5, color="gray",
-                    va="bottom", ha="left", alpha=0.9)
-
     ax_ref.set_xlabel("Generation (Op-G4*)")
     ax_ref.set_ylabel("Oldest cited generation\n(within run)")
     ax_ref.set_ylim(-0.5, x_max + 0.5)
