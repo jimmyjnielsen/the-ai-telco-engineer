@@ -95,9 +95,10 @@ def make_fig2():
     # Configurations (manager varies, agents fixed = Gemma4-26B).
     # Labels use the short Manager-Agent naming used in Table I.
     configs = [
-        ("link_adaptation_a1", "G4-G4 (local Gemma4 manager)",   "tab:gray",   "o", "-"),
-        ("link_adaptation_f0", "So-G4 (Sonnet 4.6 manager)",     "tab:orange", "s", "-"),
-        ("link_adaptation_f1", "Op-G4 (Opus 4.7 manager)",       "tab:blue",   "^", "-"),
+        ("link_adaptation_a1", "G4-G4",   "tab:gray",   "o", "-"),
+        ("link_adaptation_c2", "Ne-G4",   "tab:purple", "D", "-"),
+        ("link_adaptation_f0", "So-G4",   "tab:orange", "s", "-"),
+        ("link_adaptation_f1", "Op-G4",   "tab:blue",   "^", "-"),
     ]
 
     fig, (ax_top, ax_bot) = plt.subplots(
@@ -108,20 +109,19 @@ def make_fig2():
     # ── top: running-best on eval scale, zoomed to where the action is ──
     for task_dir, label, color, marker, style in configs:
         gens, best, _ = load_per_generation(task_dir)
-        # plot only points within the visible range
         mask = best >= 3.15
         ax_top.plot(gens[mask], best[mask], marker=marker, color=color,
                     linestyle=style, label=label)
 
-    # Reference lines — labels in the right-hand margin to avoid stacking
-    refs = [(OLLA, "OLLA", "--"),
-            (GPT_OSS_120B, "GPT-OSS 120B", ":"),
-            (GPT_5_4, "GPT-5.4", "-.")]
-    for y, lbl, ls in refs:
+    # Reference lines — labels inside the axis at the right edge
+    refs = [(OLLA,        "OLLA",         "--", "bottom"),
+            (GPT_OSS_120B,"GPT-OSS 120B", ":",  "bottom"),
+            (GPT_5_4,     "GPT-5.4",      "-.", "bottom")]
+    for y, lbl, ls, va in refs:
         ax_top.axhline(y, color="black", linewidth=0.6, linestyle=ls, alpha=0.55)
-        ax_top.annotate(lbl, xy=(1.0, y), xycoords=("axes fraction", "data"),
-                        xytext=(3, 0), textcoords="offset points",
-                        fontsize=7, color="black", alpha=0.8, va="center", ha="left")
+        ax_top.annotate(lbl, xy=(0.99, y), xycoords=("axes fraction", "data"),
+                        xytext=(0, 2), textcoords="offset points",
+                        fontsize=7, color="black", alpha=0.8, va=va, ha="right")
 
     ax_top.set_ylabel("Eval-set SE (bps/Hz)")
     ax_top.set_ylim(3.15, 3.65)
@@ -149,8 +149,7 @@ def make_fig2():
     ax_bot.text(0.02, 0.97, "(b)", transform=ax_bot.transAxes,
                 fontsize=9, fontweight="bold", va="top", ha="left")
 
-    # Tight layout, leaving room for the right-margin reference labels
-    fig.subplots_adjust(left=0.14, right=0.82, top=0.97, bottom=0.10)
+    fig.subplots_adjust(left=0.14, right=0.97, top=0.97, bottom=0.10)
 
     fig.savefig(FIG_DIR / "fig2-convergence.pdf")
     fig.savefig(FIG_DIR / "fig2-convergence.png")
