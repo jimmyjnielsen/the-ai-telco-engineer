@@ -1,0 +1,101 @@
+[
+  {
+    "rel_gen": 0,
+    "abs_gen": 4,
+    "oldest_ref": null,
+    "all_refs": []
+  },
+  {
+    "rel_gen": 1,
+    "abs_gen": 5,
+    "oldest_ref": 4,
+    "all_refs": [
+      4
+    ]
+  },
+  {
+    "rel_gen": 2,
+    "abs_gen": 6,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      5
+    ]
+  },
+  {
+    "rel_gen": 3,
+    "abs_gen": 7,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      5,
+      6
+    ]
+  },
+  {
+    "rel_gen": 4,
+    "abs_gen": 8,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  {
+    "rel_gen": 5,
+    "abs_gen": 9,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      6,
+      7,
+      8
+    ]
+  },
+  {
+    "rel_gen": 6,
+    "abs_gen": 10,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      7,
+      8,
+      9
+    ]
+  },
+  {
+    "rel_gen": 7,
+    "abs_gen": 11,
+    "oldest_ref": 4,
+    "all_refs": [
+      4,
+      6,
+      7,
+      9,
+      10
+    ]
+  },
+  {
+    "rel_gen": 8,
+    "abs_gen": 12,
+    "oldest_ref": 9,
+    "all_refs": [
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "rel_gen": 9,
+    "abs_gen": 13,
+    "oldest_ref": 9,
+    "all_refs": [
+      9,
+      10,
+      11,
+      12
+    ]
+  }
+]
