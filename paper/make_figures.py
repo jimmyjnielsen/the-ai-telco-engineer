@@ -422,11 +422,11 @@ def make_fig5():
     ax_ctx.plot(g2c, t2, marker="s", color="tab:red",  linewidth=1.2, markersize=5, label="Op-G4*")
     ax_ctx.plot(g1c, t1, marker="o", color="tab:blue", linewidth=1.2, markersize=5, label="Op-G4")
     ax_ctx.axhline(32, color="black", linestyle="--", linewidth=0.6, alpha=0.55)
-    ax_ctx.annotate("32K limit", xy=(9.2, 32), xycoords="data",
-                    xytext=(0, 3), textcoords="offset points",
-                    fontsize=7, ha="right", va="bottom", alpha=0.8)
-    ax_ctx.set_ylabel("Manager context (K tokens)")
-    ax_ctx.set_ylim(0, 36)
+    ax_ctx.annotate("32K limit", xy=(0, 32), xycoords=("axes fraction", "data"),
+                    xytext=(4, -10), textcoords="offset points",
+                    fontsize=7, ha="left", va="top", alpha=0.8)
+    ax_ctx.set_ylabel("Idea-generation prompt (K tokens)")
+    ax_ctx.set_ylim(0, 45)
     ax_ctx.grid(True, alpha=0.25)
     ax_ctx.legend(loc="upper left", framealpha=0.95, frameon=True,
                   fancybox=False, edgecolor="black", fontsize=8, handletextpad=0.4)
