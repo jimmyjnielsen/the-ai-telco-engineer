@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 TASK_DIR = REPO / "tasks" / "link_adaptation_f2"
-EVAL_SCRIPT = TASK_DIR / "evaluate_final.py"
+EVAL_SCRIPT = REPO / "tasks" / "link_adaptation_f1" / "evaluate_final.py"
 WORKSPACES = TASK_DIR / "workspaces"
 OUTPUT_JSON = REPO / "paper" / "figures" / "per_gen_eval_se.json"
 LABEL = "Op-G4*"
